@@ -21,19 +21,10 @@ struct mbediso_io* mbediso_io_from_file(FILE* file)
     io->filepos = -1;
 
     // eventually, figure out sector size here...
-    io->buffer[0] = malloc(2048);
+    io->buffer = malloc(2048);
 
-    if(!io->buffer[0])
+    if(!io->buffer)
     {
-        free(io);
-        return NULL;
-    }
-
-    io->buffer[1] = malloc(2048);
-
-    if(!io->buffer[1])
-    {
-        free(io->buffer[0]);
         free(io);
         return NULL;
     }
@@ -41,7 +32,7 @@ struct mbediso_io* mbediso_io_from_file(FILE* file)
     return (struct mbediso_io*)io;
 }
 
-const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector, bool use_secondary_buffer)
+const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector)
 {
     if(!_io)
         return NULL;
@@ -63,9 +54,7 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector, b
             }
         }
 
-        uint8_t* buffer = io->buffer[use_secondary_buffer];
-
-        if(fread(buffer, 1, 2048, io->file) != 2048)
+        if(fread(io->buffer, 1, 2048, io->file) != 2048)
         {
             printf("read failed...\n");
 
@@ -75,7 +64,7 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector, b
 
         io->filepos = (sector + 1) * 2048;
 
-        return buffer;
+        return io->buffer;
     }
 
     return NULL;
@@ -92,8 +81,7 @@ void mbediso_io_close(struct mbediso_io* _io)
 
         fclose(io->file);
 
-        free(io->buffer[1]);
-        free(io->buffer[0]);
+        free(io->buffer);
 
         free(io);
     }

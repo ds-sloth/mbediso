@@ -205,7 +205,7 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
             while(offset < cur_frame->length)
             {
                 if(buffer_dirty)
-                    buffer = mbediso_io_read_sector(io, cur_frame->sector + (offset / 2048), false);
+                    buffer = mbediso_io_read_sector(io, cur_frame->sector + (offset / 2048));
 
                 if(!buffer)
                     return -1;
@@ -346,7 +346,7 @@ int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io)
     // find the Joliet sector
     while(true)
     {
-        buffer = mbediso_io_read_sector(io, try_sector, false);
+        buffer = mbediso_io_read_sector(io, try_sector);
 
         if(!buffer || buffer[0] == 255)
             return -1;
