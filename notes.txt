@@ -1,0 +1,61 @@
+Sort order in UTF-16 =/= sort order in UTF-8 / UTF-32.
+- In particular, codepoints U+E000-U+FFFF succeed codepoints UTF+10000 and above in UTF-16.
+- This isn't terrible, put these in the buffer as normal, but keep a stack of when the surrogate portion of each character index begins and ends. When an earlier character is modified, swap the surrogate and U+E000 ranges.
+- Do not accept unpaired surrogates in any way
+
+
+- Use AFL++ for fuzzing
+
+- https://en.wikipedia.org/wiki/Red%E2%80%93black_tree
+
+- Possibly use Pearson hashing to accelerate comparisons
+
+
+Next TODOs:
+- Add code to sort a directory
+- Add code to lookup in a sorted directory
+- Begin work to construct a pathtable of loaded directories (exclude trailing slash so that more string_diffs can be shared)
+- Begin work for global stringtable consolidation
+
+
+Goal for today:
+- fix build (done)
+- setup the FS directory list (make FS own its directories) (somewhat)
+- switch to referring to directories by index (done)
+- set up free list of directories
+- allow dir_entries to refer to directories (done)
+- now, we are already able to start writing an interface!
+  - add lookup call (done)
+  - begin setting up repo structure
+
+
+
+TWO MODES:
+- Fully loaded mode
+  - Just what it sounds like
+  - All directories are sorted, the pathtable is sorted, everything is compacted into a single stringtable owned by the root
+  - Pretty easy to force everything (directories, directory entries, pathtable entries naturally, and strings) into single buffers by using a stack-like structure during load
+- Caching mode
+  - Load directories immediately upon first use
+  - Utilize partial matches in the cache (keeping in mind that the closest match may be a child of the requested directory)
+  - Will sometimes degrade to direct load -- in this case, DON'T use the ISO pathtable, and DON'T make any assumptions about sort order
+  - Not terribly difficult to keep everything in single buffers by using memmove and iterating over cache entries on unload / reallocate.
+  - Cache management may require some interesting heuristics
+
+- When loading fully loaded mode, load directory first, then recurse
+  - This lets us load fully, sort, compact (fully), and then recurse
+  - Also lets us reuse code better
+- In both modes, represent data as (roughly) a stack
+  - Exception: during fully-loaded mode load phase, the red-black tree of unique strings must be stored elsewhere, and is highly dynamic (I think)
+- When loading, first allocate 60 entries per sector, then allocate the strings
+  - Then, shrink entries to fit, and hope this leaves enough space for the compacted stringtable
+  - In fully-loaded mode, the compacted strings are stored in the unique stringtable -- fairly helpful, though maintaining the unique stringtable may be difficult as well
+- When operating in cache mode, the whole stack (past a certain level) will belong to the cached directories.
+  - Use a single memmove to move all content past the evicted entry to an earlier address in memory, and update all addresses to point to the earlier address
+
+- Overall memory layout:
+  - Static bookkeeping information
+    - Includes cache directory structs
+  - Directory stack
+  - (Fully-loaded mode) string table
+    - Includes red-black tree during load time

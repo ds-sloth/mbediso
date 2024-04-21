@@ -1,0 +1,40 @@
+PROCEDURE:
+
+(1) Load path table (may fail due to RAM, if so, mark path table as incomplete and incorrect):
+  - sort entries
+  - compact entries
+
+(2) Load directories:
+- skip if all of the following conditions hold:
+  - secondary path table has failed
+  - whole iso has at least one unsorted directory
+  - archive path table is inaccurate
+- lookup in path table (possibly pushing new entry in compacted form onto secondary path table, may fail)
+  - if secondary path table realloc fails, wipe ALL directory records
+  - still sufficient to test archive path table completeness and correctness
+- allocate directory record (may fail)
+  - if fails, or if directory got erased lower in recursion tree, need to reuse 2048b buffer during recursion
+- load by sectors (buffering 2048b)
+  - check sort order (334b * 2)
+    - update path table if present
+    - update whole iso if present
+  - attempt to register entry
+    - use directory's own stringtable
+  - recurse if needed
+- sort and compact entries
+- recurse now if possible
+
+(3) Merge and recompact path tables
+(4) Deduplicate strings
+
+
+
+Why structs for individual directories? Facilitates partial loading of the filesystem, instead of exclusively supporting full loading.
+
+
+Refactor everything for memory management EVENTUALLY:
+- Load-time RAM:
+  - Stack for dir entries
+  - Stack for dir strings (compacted dir strings go into a totally different long-term table)
+  - Two load buffers (may be used for string processing during the finalize stage)
+  - One work buffer
