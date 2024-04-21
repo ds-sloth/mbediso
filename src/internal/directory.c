@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "j9660.h"
+#include "mbediso.h"
 
-bool j9660_directory_ctor(struct j9660_directory* dir)
+bool mbediso_directory_ctor(struct mbediso_directory* dir)
 {
     if(!dir)
         return false;
@@ -28,7 +28,7 @@ bool j9660_directory_ctor(struct j9660_directory* dir)
     return true;
 }
 
-void j9660_directory_dtor(struct j9660_directory* dir)
+void mbediso_directory_dtor(struct mbediso_directory* dir)
 {
     if(!dir)
         return;
@@ -37,7 +37,7 @@ void j9660_directory_dtor(struct j9660_directory* dir)
     free(dir->entries);
 }
 
-int j9660_directory_push(struct j9660_directory* dir, const struct j9660_raw_entry* raw_entry)
+int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* raw_entry)
 {
     if(!dir || !raw_entry)
         return -1;
@@ -49,8 +49,8 @@ int j9660_directory_push(struct j9660_directory* dir, const struct j9660_raw_ent
     // make sure there is capacity for entry
     if(dir->entry_count + 1 > dir->entry_capacity)
     {
-        size_t new_capacity = j9660_util_first_pow2(dir->entry_capacity + 1);
-        struct j9660_dir_entry* new_entries = realloc(dir->entries, new_capacity * sizeof(struct j9660_dir_entry));
+        size_t new_capacity = mbediso_util_first_pow2(dir->entry_capacity + 1);
+        struct mbediso_dir_entry* new_entries = realloc(dir->entries, new_capacity * sizeof(struct mbediso_dir_entry));
         if(new_entries)
         {
             dir->entries = new_entries;
@@ -64,7 +64,7 @@ int j9660_directory_push(struct j9660_directory* dir, const struct j9660_raw_ent
     // make sure there is capacity for filename
     if(dir->stringtable_size + fn_len > dir->stringtable_capacity)
     {
-        size_t new_capacity = j9660_util_first_pow2(dir->stringtable_capacity + fn_len);
+        size_t new_capacity = mbediso_util_first_pow2(dir->stringtable_capacity + fn_len);
         uint8_t* new_stringtable = realloc(dir->stringtable, new_capacity);
         if(new_stringtable)
         {
@@ -78,7 +78,7 @@ int j9660_directory_push(struct j9660_directory* dir, const struct j9660_raw_ent
 
     // function must succeed at this point, begin allocating and copying data
 
-    struct j9660_dir_entry* entry = &dir->entries[dir->entry_count];
+    struct mbediso_dir_entry* entry = &dir->entries[dir->entry_count];
     dir->entry_count++;
 
     // copy information from raw_entry
@@ -100,12 +100,12 @@ int j9660_directory_push(struct j9660_directory* dir, const struct j9660_raw_ent
     return 0;
 }
 
-static const struct j9660_directory* s_sort_dir = NULL;
+static const struct mbediso_directory* s_sort_dir = NULL;
 
 static int s_directory_entry_cmp_PRECOMPACT(const void* m1, const void* m2)
 {
-    const struct j9660_dir_entry* e1 = (const struct j9660_dir_entry*)m1;
-    const struct j9660_dir_entry* e2 = (const struct j9660_dir_entry*)m2;
+    const struct mbediso_dir_entry* e1 = (const struct mbediso_dir_entry*)m1;
+    const struct mbediso_dir_entry* e2 = (const struct mbediso_dir_entry*)m2;
 
     int len_cmp = 0;
     if(e1->filename.subst_end < e2->filename.subst_end)
@@ -125,22 +125,22 @@ static int s_directory_entry_cmp_PRECOMPACT(const void* m1, const void* m2)
     return ret;
 }
 
-static void s_directory_sort_PRECOMPACT(struct j9660_directory* dir)
+static void s_directory_sort_PRECOMPACT(struct mbediso_directory* dir)
 {
     if(dir->entry_count > 2)
     {
         // WARNING: need to deadlock file open with multiple threads in cache mode
         s_sort_dir = dir;
-        qsort(dir->entries + 2, dir->entry_count - 2, sizeof(struct j9660_dir_entry), s_directory_entry_cmp_PRECOMPACT);
+        qsort(dir->entries + 2, dir->entry_count - 2, sizeof(struct mbediso_dir_entry), s_directory_entry_cmp_PRECOMPACT);
         s_sort_dir = NULL;
     }
 
     dir->utf8_sorted = true;
 }
 
-const struct j9660_dir_entry* j9660_directory_lookup(const struct j9660_directory* dir, const char* filename, uint32_t filename_length)
+const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* filename, uint32_t filename_length)
 {
-    struct j9660_filename temp_filename;
+    struct mbediso_filename temp_filename;
 
     if(filename_length > sizeof(temp_filename.buffer))
         return NULL;
@@ -153,7 +153,7 @@ const struct j9660_dir_entry* j9660_directory_lookup(const struct j9660_director
     {
         uint32_t mid = begin + (end - begin) / 2;
 
-        if(j9660_string_diff_reconstruct(temp_filename.buffer, sizeof(temp_filename.buffer), dir->stringtable, dir->entries, dir->entry_count, sizeof(struct j9660_dir_entry), mid))
+        if(mbediso_string_diff_reconstruct(temp_filename.buffer, sizeof(temp_filename.buffer), dir->stringtable, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), mid))
             return NULL;
 
         int cmp_ret = strncmp((const char*)temp_filename.buffer, (const char*)filename, filename_length);
@@ -170,12 +170,12 @@ const struct j9660_dir_entry* j9660_directory_lookup(const struct j9660_director
 }
 
 
-int j9660_directory_finish(struct j9660_directory* dir)
+int mbediso_directory_finish(struct mbediso_directory* dir)
 {
     if(!dir->utf8_sorted)
         s_directory_sort_PRECOMPACT(dir);
 
-    int ret = j9660_string_diff_compact(&dir->stringtable, &dir->stringtable_size, dir->entries, dir->entry_count, sizeof(struct j9660_dir_entry));
+    int ret = mbediso_string_diff_compact(&dir->stringtable, &dir->stringtable_size, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry));
     if(ret)
         return ret;
 
@@ -188,7 +188,7 @@ int j9660_directory_finish(struct j9660_directory* dir)
     }
 
     // shrink entry list to fit
-    struct j9660_dir_entry* new_entries = realloc(dir->entries, dir->entry_count * sizeof(struct j9660_dir_entry));
+    struct mbediso_dir_entry* new_entries = realloc(dir->entries, dir->entry_count * sizeof(struct mbediso_dir_entry));
     if(new_entries)
     {
         dir->entries = new_entries;

@@ -5,11 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "j9660.h"
+#include "mbediso.h"
 
-struct j9660_io* j9660_io_from_file(FILE* file)
+struct mbediso_io* mbediso_io_from_file(FILE* file)
 {
-    struct j9660_io_file* io = malloc(sizeof(struct j9660_io_file));
+    struct mbediso_io_file* io = malloc(sizeof(struct mbediso_io_file));
 
     if(!io)
         return NULL;
@@ -36,17 +36,17 @@ struct j9660_io* j9660_io_from_file(FILE* file)
         return NULL;
     }
 
-    return (struct j9660_io*)io;
+    return (struct mbediso_io*)io;
 }
 
-const uint8_t* j9660_io_read_sector(struct j9660_io* _io, uint32_t sector, bool use_secondary_buffer)
+const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector, bool use_secondary_buffer)
 {
     if(!_io)
         return NULL;
 
     if(_io->tag == 1)
     {
-        struct j9660_io_file* io = (struct j9660_io_file*)_io;
+        struct mbediso_io_file* io = (struct mbediso_io_file*)_io;
 
         uint64_t target_pos = sector * 2048;
 
@@ -79,14 +79,14 @@ const uint8_t* j9660_io_read_sector(struct j9660_io* _io, uint32_t sector, bool 
     return NULL;
 }
 
-void j9660_io_close(struct j9660_io* _io)
+void mbediso_io_close(struct mbediso_io* _io)
 {
     if(!_io)
         return;
 
     if(_io->tag == 1)
     {
-        struct j9660_io_file* io = (struct j9660_io_file*)_io;
+        struct mbediso_io_file* io = (struct mbediso_io_file*)_io;
 
         fclose(io->file);
 

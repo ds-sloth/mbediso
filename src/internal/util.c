@@ -1,6 +1,6 @@
 #include <stddef.h>
 
-size_t j9660_util_first_pow2(size_t capacity)
+size_t mbediso_util_first_pow2(size_t capacity)
 {
     for(size_t power = 0; power <= 24; ++power)
     {

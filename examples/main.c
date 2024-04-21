@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "j9660.h"
+#include "mbediso.h"
 
 int main(int argc, char** argv)
 {
@@ -13,10 +13,10 @@ int main(int argc, char** argv)
     if(!f)
         return 1;
 
-    struct j9660_fs fs;
-    j9660_fs_ctor(&fs);
+    struct mbediso_fs fs;
+    mbediso_fs_ctor(&fs);
 
-    struct j9660_io* io = j9660_io_from_file(f);
+    struct mbediso_io* io = mbediso_io_from_file(f);
     if(!io)
     {
         fclose(f);
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
     while(scanf(" %1023[^\n]", req_fn) == 1)
     {
-        const struct j9660_dir_entry* found = j9660_fs_lookup(&fs, req_fn, strlen(req_fn));
+        const struct mbediso_dir_entry* found = mbediso_fs_lookup(&fs, req_fn, strlen(req_fn));
 
         if(!found)
             printf("  NOT FOUND\n");
@@ -50,15 +50,15 @@ int main(int argc, char** argv)
             printf("  NOT FULLY LOADED\n");
         else
         {
-            const struct j9660_directory* dir = &fs.directories[found->sector];
+            const struct mbediso_directory* dir = &fs.directories[found->sector];
 
             printf("Directory listing:\n");
             for(size_t e = 0; e < dir->entry_count; e++)
             {
-                const struct j9660_dir_entry* real_entry = &dir->entries[e];
+                const struct mbediso_dir_entry* real_entry = &dir->entries[e];
 
                 uint8_t filename_buffer[1024];
-                if(j9660_string_diff_reconstruct(filename_buffer, 1024, dir->stringtable, dir->entries, dir->entry_count, sizeof(struct j9660_dir_entry), e))
+                if(mbediso_string_diff_reconstruct(filename_buffer, 1024, dir->stringtable, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), e))
                     filename_buffer[0] = '\0';
                 printf("  %d offset %x, length %x, filename [%s]\n", (int)real_entry->directory, real_entry->sector * 2048, real_entry->length, filename_buffer);
             }
@@ -67,9 +67,9 @@ int main(int argc, char** argv)
         req_fn[0] = '\0';
     }
 
-    j9660_io_close(io);
+    mbediso_io_close(io);
 
-    j9660_fs_dtor(&fs);
+    mbediso_fs_dtor(&fs);
 
     return 0;
 }

@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "j9660.h"
+#include "mbediso.h"
 
-int j9660_string_diff_reconstruct(uint8_t* buffer, size_t buffer_size, const uint8_t* stringtable, const void* entries, size_t entry_count, size_t entry_size, size_t top_entry)
+int mbediso_string_diff_reconstruct(uint8_t* buffer, size_t buffer_size, const uint8_t* stringtable, const void* entries, size_t entry_count, size_t entry_size, size_t top_entry)
 {
     size_t clip_at = -1;
     size_t last_effective_entry = top_entry;
@@ -49,7 +49,7 @@ int j9660_string_diff_reconstruct(uint8_t* buffer, size_t buffer_size, const uin
     return 0;
 }
 
-int j9660_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_size, void* entries, size_t entry_count, size_t entry_size)
+int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_size, void* entries, size_t entry_count, size_t entry_size)
 {
     if(entry_count == 0)
         return 0;

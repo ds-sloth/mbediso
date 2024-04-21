@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "j9660.h"
+#include "mbediso.h"
 
 int utf16be_to_utf8(uint8_t* restrict dest, ptrdiff_t capacity, const uint8_t* restrict src, size_t bytes)
 {
@@ -105,7 +105,7 @@ int utf16be_to_utf8(uint8_t* restrict dest, ptrdiff_t capacity, const uint8_t* r
  *
  * \returns On success or partial success, number of bytes of buffer consumed (at least 33). On total failure (the parent directory should be abandoned), returns -1.
  **/
-int read_dir_entry(struct j9660_raw_entry* entry, const uint8_t* buffer, int buffer_size)
+int read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffer, int buffer_size)
 {
     if(buffer_size < 33 || buffer[0] < 33 || buffer[0] > buffer_size)
         return -1;
@@ -139,7 +139,7 @@ int read_dir_entry(struct j9660_raw_entry* entry, const uint8_t* buffer, int buf
         entry->filename.buffer[1] = (buffer[33]) ? '.' : '\0';
         entry->filename.buffer[2] = '\0';
     }
-    else if(utf16be_to_utf8(entry->filename.buffer, (ptrdiff_t)sizeof(struct j9660_filename), buffer + 33, filename_length_bytes))
+    else if(utf16be_to_utf8(entry->filename.buffer, (ptrdiff_t)sizeof(struct mbediso_filename), buffer + 33, filename_length_bytes))
     {
         entry->filename.buffer[0] = '\0';
         return buffer[0];
@@ -157,7 +157,7 @@ int read_dir_entry(struct j9660_raw_entry* entry, const uint8_t* buffer, int buf
     return buffer[0];
 }
 
-struct j9660_read_stack_frame
+struct mbediso_read_stack_frame
 {
     uint32_t dir_index;
     uint32_t sector;
@@ -165,12 +165,12 @@ struct j9660_read_stack_frame
     uint32_t length;
 };
 
-int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t length)
+int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint32_t length)
 {
     int old_size = 0;
     int total_size = 0;
 
-    struct j9660_raw_entry entry[2];
+    struct mbediso_raw_entry entry[2];
     uint32_t entry_index = 0;
 
     // add a buffer for the full path currently being constructed, use this to recover the directory's name for sort detection when needed...
@@ -179,15 +179,15 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
     full_path_buffer[0] = '/';
     uint16_t full_path_buffer_size = 1;
 
-    struct j9660_read_stack_frame stack[16];
+    struct mbediso_read_stack_frame stack[16];
     uint32_t stack_level = 0;
 
-    stack[stack_level].dir_index = j9660_fs_alloc_directory(fs);
+    stack[stack_level].dir_index = mbediso_fs_alloc_directory(fs);
     stack[stack_level].offset = 0;
     stack[stack_level].sector = sector;
     stack[stack_level].length = length;
 
-    if(stack[stack_level].dir_index == J9660_NULL_REF)
+    if(stack[stack_level].dir_index == MBEDISO_NULL_REF)
         return -1;
 
 
@@ -196,29 +196,29 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
 
     while(stack_level < 16)
     {
-        struct j9660_read_stack_frame* const cur_frame = &stack[stack_level];
+        struct mbediso_read_stack_frame* const cur_frame = &stack[stack_level];
 
-        struct j9660_directory* dir = &fs->directories[cur_frame->dir_index];
+        struct mbediso_directory* dir = &fs->directories[cur_frame->dir_index];
 
         // done reading a directory
         if(cur_frame->offset >= cur_frame->length)
         {
             old_size += dir->stringtable_size;
 
-            j9660_directory_finish(dir);
+            mbediso_directory_finish(dir);
 
             total_size += dir->stringtable_size;
 
             // printf("In directory [%s] (%d):\n", full_path_buffer, (int)dir->utf8_sorted);
             // for(size_t e = 0; e < dir->entry_count; e++)
             // {
-                // const struct j9660_dir_entry* real_entry = &dir->entries[e];
-                // if(j9660_string_diff_reconstruct(filename_buffer, 1024, dir->stringtable, dir->entries, dir->entry_count, sizeof(struct j9660_dir_entry), e))
+                // const struct mbediso_dir_entry* real_entry = &dir->entries[e];
+                // if(mbediso_string_diff_reconstruct(filename_buffer, 1024, dir->stringtable, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), e))
                     // filename_buffer[0] = '\0';
                 // printf("  %d offset %x, length %x, filename [%s]\n", (int)real_entry->directory, real_entry->sector * 2048, real_entry->length, filename_buffer);
             // }
 
-            // j9660_fs_free_directory(fs, dir);
+            // mbediso_fs_free_directory(fs, dir);
 
             // add reference to the child directory!!!
 
@@ -256,14 +256,14 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
 
         if(buffer_dirty[stack_level & 1])
         {
-            buffer[stack_level & 1] = j9660_io_read_sector(io, cur_frame->sector + (cur_frame->offset / 2048), stack_level & 1);
+            buffer[stack_level & 1] = mbediso_io_read_sector(io, cur_frame->sector + (cur_frame->offset / 2048), stack_level & 1);
             buffer_dirty[stack_level & 1] = false;
         }
 
         if(!buffer[stack_level & 1])
             return -1;
 
-        struct j9660_raw_entry* const cur_entry = &entry[entry_index & 1];
+        struct mbediso_raw_entry* const cur_entry = &entry[entry_index & 1];
 
         int ret = read_dir_entry(cur_entry, buffer[stack_level & 1] + (cur_frame->offset % 2048), 2048 - (cur_frame->offset % 2048));
 
@@ -288,10 +288,10 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
         if(cur_entry->filename.buffer[0] == '\0')
             continue;
 
-        if(j9660_directory_push(dir, cur_entry))
+        if(mbediso_directory_push(dir, cur_entry))
         {
             // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
-            // j9660_fs_free_directory(fs, dir);
+            // mbediso_fs_free_directory(fs, dir);
             return -1;
         }
 
@@ -303,7 +303,7 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
             const uint8_t* this_fn = cur_entry->filename.buffer;
 
             // check sort order
-            int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct j9660_filename));
+            int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct mbediso_filename));
             if(sort_order >= 0)
             {
                 printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
@@ -339,8 +339,8 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
             }
 
             // check that we can alloc the directory
-            uint32_t new_dir_index = j9660_fs_alloc_directory(fs);
-            if(new_dir_index == J9660_NULL_REF)
+            uint32_t new_dir_index = mbediso_fs_alloc_directory(fs);
+            if(new_dir_index == MBEDISO_NULL_REF)
             {
                 // this should be a total failure
                 continue;
@@ -381,9 +381,9 @@ int scan_dir(struct j9660_fs* fs, struct j9660_io* io, uint32_t sector, uint32_t
     return 0;
 }
 
-int find_joliet_root(struct j9660_fs* fs, struct j9660_io* io)
+int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io)
 {
-    struct j9660_raw_entry entry;
+    struct mbediso_raw_entry entry;
 
     uint32_t try_sector = 16;
 
@@ -393,7 +393,7 @@ int find_joliet_root(struct j9660_fs* fs, struct j9660_io* io)
     // find the Joliet sector
     while(true)
     {
-        buffer = j9660_io_read_sector(io, try_sector, false);
+        buffer = mbediso_io_read_sector(io, try_sector, false);
 
         if(!buffer || buffer[0] == 255)
             return -1;
