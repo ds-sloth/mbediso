@@ -7,6 +7,9 @@
 
 #include "mbediso.h"
 
+#include "internal/util.h"
+#include "internal/fs.h"
+
 bool mbediso_fs_ctor(struct mbediso_fs* fs)
 {
     if(!fs)

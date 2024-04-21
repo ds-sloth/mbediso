@@ -7,6 +7,10 @@
 
 #include "mbediso.h"
 
+#include "internal/io.h"
+#include "internal/fs.h"
+
+
 int utf16be_to_utf8(uint8_t* restrict dest, ptrdiff_t capacity, const uint8_t* restrict src, size_t bytes)
 {
     if(bytes & 1)

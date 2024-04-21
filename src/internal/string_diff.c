@@ -7,6 +7,8 @@
 
 #include "mbediso.h"
 
+#include "internal/string_diff.h"
+
 int mbediso_string_diff_reconstruct(uint8_t* buffer, size_t buffer_size, const uint8_t* stringtable, const void* entries, size_t entry_count, size_t entry_size, size_t top_entry)
 {
     size_t clip_at = -1;
@@ -15,7 +17,7 @@ int mbediso_string_diff_reconstruct(uint8_t* buffer, size_t buffer_size, const u
 
     while(last_effective_entry < entry_count)
     {
-        const struct string_diff* entry = (const struct string_diff*)((const uint8_t*)entries + (entry_size * last_effective_entry));
+        const struct mbediso_string_diff* entry = (const struct mbediso_string_diff*)((const uint8_t*)entries + (entry_size * last_effective_entry));
 
         size_t end_effective = clip_at;
         if(end_effective > entry->subst_end)
@@ -61,7 +63,7 @@ int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_siz
     if(!new_stringtable)
         return -1;
 
-    struct string_diff* last_entry = (struct string_diff*)(entries);
+    struct mbediso_string_diff* last_entry = (struct mbediso_string_diff*)(entries);
     if(!last_entry->clip_end || last_entry->subst_begin != 0)
     {
         free(new_stringtable);
@@ -74,7 +76,7 @@ int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_siz
 
     for(size_t e = 1; e < entry_count; ++e)
     {
-        struct string_diff* entry = (struct string_diff*)((uint8_t*)entries + (entry_size * e));
+        struct mbediso_string_diff* entry = (struct mbediso_string_diff*)((uint8_t*)entries + (entry_size * e));
         if(!entry->clip_end || entry->subst_begin != 0)
         {
             free(new_stringtable);
@@ -145,7 +147,7 @@ int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_siz
 
         while(entry->last_effective_entry < entry_count)
         {
-            struct string_diff* o_entry = (struct string_diff*)((uint8_t*)entries + (entry_size * entry->last_effective_entry));
+            struct mbediso_string_diff* o_entry = (struct mbediso_string_diff*)((uint8_t*)entries + (entry_size * entry->last_effective_entry));
 
             size_t o_entry_eff_end = o_entry->subst_end;
             if(o_entry_eff_end > clip_at)

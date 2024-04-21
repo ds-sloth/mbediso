@@ -1,0 +1,55 @@
+#pragma once
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "internal/string_diff.h"
+
+/* struct for a single filename */
+struct mbediso_filename
+{
+    uint8_t buffer[334];
+};
+
+/* struct for a raw directory entry */
+struct mbediso_raw_entry
+{
+    struct mbediso_filename filename;
+    uint32_t sector;
+    uint32_t length;
+    bool directory;
+};
+
+/* struct for a directory entry suitable for long-term storage */
+struct mbediso_dir_entry
+{
+    struct mbediso_string_diff filename;
+    uint32_t sector;
+    uint32_t length;
+    bool directory;
+};
+
+/* represents the contents of a single directory */
+struct mbediso_directory
+{
+    /* if null, the directory strings have been permanently consolidated to the global stringtable */
+    uint8_t* stringtable;
+    uint32_t stringtable_size;
+    uint32_t stringtable_capacity;
+
+    struct mbediso_dir_entry* entries;
+    uint32_t entry_count;
+    uint32_t entry_capacity;
+
+    /* tracks whether the directory is utf8-sorted */
+    bool utf8_sorted;
+};
+
+extern bool mbediso_directory_ctor(struct mbediso_directory* dir);
+extern void mbediso_directory_dtor(struct mbediso_directory* dir);
+
+extern int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
+extern const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* filename, uint32_t filename_length);
+
+/* finish the load process for a directory */
+extern int mbediso_directory_finish(struct mbediso_directory* dir);

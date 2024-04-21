@@ -12,7 +12,7 @@ set(MBEDISO_SRC
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
 
-target_include_directories(mbediso PRIVATE
+target_include_directories(mbediso PUBLIC # should be PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

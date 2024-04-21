@@ -7,6 +7,9 @@
 
 #include "mbediso.h"
 
+#include "internal/io.h"
+#include "internal/fs.h"
+
 int main(int argc, char** argv)
 {
     FILE* f = fopen("thextech-super-talking-time-bros-1n2-v1-5.iso", "rb");

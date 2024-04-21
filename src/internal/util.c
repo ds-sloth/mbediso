@@ -1,4 +1,4 @@
-#include <stddef.h>
+#include "internal/util.h"
 
 size_t mbediso_util_first_pow2(size_t capacity)
 {

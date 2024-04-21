@@ -7,6 +7,8 @@
 
 #include "mbediso.h"
 
+#include "internal/io.h"
+
 struct mbediso_io* mbediso_io_from_file(FILE* file)
 {
     struct mbediso_io_file* io = malloc(sizeof(struct mbediso_io_file));

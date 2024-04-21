@@ -7,6 +7,9 @@
 
 #include "mbediso.h"
 
+#include "internal/util.h"
+#include "internal/directory.h"
+
 bool mbediso_directory_ctor(struct mbediso_directory* dir)
 {
     if(!dir)
