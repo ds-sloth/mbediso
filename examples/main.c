@@ -12,7 +12,7 @@
 
 int main(int argc, char** argv)
 {
-    FILE* f = fopen("thextech-super-talking-time-bros-1n2-v1-5.iso", "rb");
+    FILE* f = fopen(argc > 1 ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso", "rb");
     if(!f)
         return 1;
 
