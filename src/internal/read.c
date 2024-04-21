@@ -165,8 +165,8 @@ struct mbediso_read_stack_frame
 {
     uint32_t dir_index;
     uint32_t sector;
-    uint32_t offset;
     uint32_t length;
+    uint32_t recurse_child; // which child to expand in this step
 };
 
 int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint32_t length)
@@ -175,28 +175,17 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
     int total_size = 0;
 
     struct mbediso_raw_entry entry[2];
-    uint32_t entry_index = 0;
-
-    // add a buffer for the full path currently being constructed, use this to recover the directory's name for sort detection when needed...
-    uint8_t full_path_buffer[1024];
-
-    full_path_buffer[0] = '/';
-    uint16_t full_path_buffer_size = 1;
 
     struct mbediso_read_stack_frame stack[16];
     uint32_t stack_level = 0;
 
     stack[stack_level].dir_index = mbediso_fs_alloc_directory(fs);
-    stack[stack_level].offset = 0;
     stack[stack_level].sector = sector;
     stack[stack_level].length = length;
+    stack[stack_level].recurse_child = 0;
 
     if(stack[stack_level].dir_index == MBEDISO_NULL_REF)
         return -1;
-
-
-    const uint8_t* buffer[2] = {NULL, NULL};
-    bool buffer_dirty[2] = {true, true};
 
     while(stack_level < 16)
     {
@@ -204,121 +193,93 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
 
         struct mbediso_directory* dir = &fs->directories[cur_frame->dir_index];
 
-        // done reading a directory
-        if(cur_frame->offset >= cur_frame->length)
+        // read directory itself on first step
+        if(cur_frame->recurse_child < 2)
         {
-            old_size += dir->stringtable_size;
+            uint32_t entry_index = 0;
+            uint32_t offset = 0;
 
-            mbediso_directory_finish(dir);
+            const uint8_t* buffer = NULL;
+            bool buffer_dirty = true;
 
-            total_size += dir->stringtable_size;
-
-            // printf("In directory [%s] (%d):\n", full_path_buffer, (int)dir->utf8_sorted);
-            // for(size_t e = 0; e < dir->entry_count; e++)
-            // {
-                // const struct mbediso_dir_entry* real_entry = &dir->entries[e];
-                // if(mbediso_string_diff_reconstruct(filename_buffer, 1024, dir->stringtable, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), e))
-                    // filename_buffer[0] = '\0';
-                // printf("  %d offset %x, length %x, filename [%s]\n", (int)real_entry->directory, real_entry->sector * 2048, real_entry->length, filename_buffer);
-            // }
-
-            // mbediso_fs_free_directory(fs, dir);
-
-            // add reference to the child directory!!!
-
-            // invalidate buffer used for this directory
-            buffer_dirty[stack_level & 1] = true;
-
-            // reduce the stack level
-            stack_level--;
-
-            // prepare to resume reading
-            if(stack_level < 16)
+            while(offset < cur_frame->length)
             {
-                entry_index = 3;
+                if(buffer_dirty)
+                    buffer = mbediso_io_read_sector(io, cur_frame->sector + (offset / 2048), false);
 
-                // reduce the full path buffer
-                uint16_t old_full_path_buffer_size = full_path_buffer_size;
+                if(!buffer)
+                    return -1;
 
-                while(full_path_buffer_size > 1)
+                struct mbediso_raw_entry* const cur_entry = &entry[entry_index & 1];
+
+                int ret = read_dir_entry(cur_entry, buffer + (offset % 2048), 2048 - (offset % 2048));
+
+                if(ret < 33)
                 {
-                    full_path_buffer_size--;
-
-                    if(full_path_buffer[full_path_buffer_size - 1] == '/')
-                        break;
+                    // any cleanup needed?
+                    return -1;
                 }
 
-                // copy the current directory name to the previous entry for the parent to continue checking sorting
-                memcpy(entry[0].filename.buffer, &full_path_buffer[full_path_buffer_size], old_full_path_buffer_size - full_path_buffer_size - 1);
-                entry[0].filename.buffer[old_full_path_buffer_size - full_path_buffer_size - 1] = '\0';
+                buffer_dirty = ((offset % 2048) + ret >= 2048);
+                offset += ret;
 
-                full_path_buffer[full_path_buffer_size] = '\0';
+                if(!buffer_dirty && buffer[offset % 2048] == '\0')
+                {
+                    buffer_dirty = true;
+                    offset += 2048 - (offset % 2048);
+                }
+
+                // skip on partial failure
+                if(cur_entry->filename.buffer[0] == '\0')
+                    continue;
+
+                if(mbediso_directory_push(dir, cur_entry))
+                {
+                    // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
+                    // mbediso_fs_free_directory(fs, dir);
+                    return -1;
+                }
+
+                // printf("%d offset %x, length %x, filename %s\n", (int)entry[entry_index & 1].directory, entry[entry_index & 1].sector * 2048, entry[entry_index & 1].length, entry[entry_index & 1].filename.buffer);
+
+                if(entry_index > 2)
+                {
+                    const uint8_t* prev_fn = entry[!(entry_index & 1)].filename.buffer;
+                    const uint8_t* this_fn = cur_entry->filename.buffer;
+
+                    // check sort order
+                    int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct mbediso_filename));
+                    if(sort_order >= 0)
+                    {
+                        printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
+                        dir->utf8_sorted = false;
+                    }
+                }
+
+                entry_index++;
             }
 
+            // finalize the directory
+            old_size += dir->stringtable_size;
+            mbediso_directory_finish(dir);
+            total_size += dir->stringtable_size;
+
+            // now, start expanding actual children
+            cur_frame->recurse_child = 2;
+        }
+
+        // done expanding children
+        if(cur_frame->recurse_child >= dir->entry_count)
+        {
+            stack_level--;
             continue;
         }
 
-        if(buffer_dirty[stack_level & 1])
-        {
-            buffer[stack_level & 1] = mbediso_io_read_sector(io, cur_frame->sector + (cur_frame->offset / 2048), stack_level & 1);
-            buffer_dirty[stack_level & 1] = false;
-        }
-
-        if(!buffer[stack_level & 1])
-            return -1;
-
-        struct mbediso_raw_entry* const cur_entry = &entry[entry_index & 1];
-
-        int ret = read_dir_entry(cur_entry, buffer[stack_level & 1] + (cur_frame->offset % 2048), 2048 - (cur_frame->offset % 2048));
-
-        // printf("%d %p\n", (int)offset, buffer[stack_level & 1] + (offset % 2048));
-
-        if(ret < 33)
-        {
-            // any cleanup needed?
-            return -1;
-        }
-
-        buffer_dirty[stack_level & 1] = ((cur_frame->offset % 2048) + ret >= 2048);
-        cur_frame->offset += ret;
-
-        if(!buffer_dirty[stack_level & 1] && buffer[stack_level & 1][cur_frame->offset % 2048] == '\0')
-        {
-            buffer_dirty[stack_level & 1] = true;
-            cur_frame->offset += 2048 - (cur_frame->offset % 2048);
-        }
-
-        // skip on partial failure
-        if(cur_entry->filename.buffer[0] == '\0')
-            continue;
-
-        if(mbediso_directory_push(dir, cur_entry))
-        {
-            // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
-            // mbediso_fs_free_directory(fs, dir);
-            return -1;
-        }
-
-        // printf("%d offset %x, length %x, filename %s\n", (int)entry[entry_index & 1].directory, entry[entry_index & 1].sector * 2048, entry[entry_index & 1].length, entry[entry_index & 1].filename.buffer);
-
-        if(entry_index > 2)
-        {
-            const uint8_t* prev_fn = entry[!(entry_index & 1)].filename.buffer;
-            const uint8_t* this_fn = cur_entry->filename.buffer;
-
-            // check sort order
-            int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct mbediso_filename));
-            if(sort_order >= 0)
-            {
-                printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
-                dir->utf8_sorted = false;
-            }
-        }
-
-        entry_index++;
+        struct mbediso_dir_entry* cur_entry = &dir->entries[cur_frame->recurse_child];
+        cur_frame->recurse_child++;
 
         // consider opening a new frame
-        if(cur_entry->directory && entry_index > 2)
+        if(cur_entry->directory)
         {
             // check for loops
             uint32_t loop_level;
@@ -331,7 +292,8 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
             // don't expand a loop...!
             if(loop_level <= stack_level)
             {
-                // instead, mark it properly
+                // instead, mark it properly... "SOON".
+                // should be something like setting the length of cur_entry to zero and the sector to the dir_index of the loop_level
                 continue;
             }
 
@@ -353,30 +315,17 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
             // (directory pointer got invalidated by allocation above)
             dir = &fs->directories[cur_frame->dir_index];
 
-            // add reference to child directory index
-            dir->entries[dir->entry_count - 1].length = 0;
-            dir->entries[dir->entry_count - 1].sector = new_dir_index;
-
             // okay, we can expand.
             stack_level++;
-            entry_index = 0;
-
-            buffer_dirty[stack_level & 1] = true;
 
             stack[stack_level].dir_index = new_dir_index;
-            stack[stack_level].offset = 0;
+            stack[stack_level].recurse_child = 0;
             stack[stack_level].sector = cur_entry->sector;
             stack[stack_level].length = cur_entry->length;
 
-            // expand the full path buffer
-            size_t fn_len = strlen((const char*)cur_entry->filename.buffer);
-            if(full_path_buffer_size + fn_len + 2 < 1024)
-            {
-                memcpy(&full_path_buffer[full_path_buffer_size], cur_entry->filename.buffer, fn_len);
-                full_path_buffer_size += fn_len + 1;
-                full_path_buffer[full_path_buffer_size - 1] = '/';
-                full_path_buffer[full_path_buffer_size] = '\0';
-            }
+            // add reference to child directory index
+            cur_entry->length = 0;
+            cur_entry->sector = new_dir_index;
         }
     }
 
