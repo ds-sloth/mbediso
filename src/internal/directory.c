@@ -45,8 +45,17 @@ int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_r
     if(!dir || !raw_entry)
         return -1;
 
+    // make sure entry's filename is not overlong (FIXME: make sure filenames are never overlong in source and pass length to this function)
     size_t fn_len = strlen((const char*)raw_entry->filename.buffer);
-    if(fn_len > 333)
+    if(fn_len == 0 || fn_len > 333)
+        return -1;
+
+    // make sure first entry is '.', second is '..', and no others are either of these
+    if(dir->entry_count == 0 && (fn_len != 1 || raw_entry->filename.buffer[0] != '.'))
+        return -1;
+    else if(dir->entry_count == 1 && (fn_len != 2 || raw_entry->filename.buffer[0] != '.' || raw_entry->filename.buffer[1] != '.'))
+        return -1;
+    else if(dir->entry_count >= 2 && fn_len <= 2 && raw_entry->filename.buffer[0] == '.' && (fn_len == 1 || raw_entry->filename.buffer[1] == '.'))
         return -1;
 
     // make sure there is capacity for entry

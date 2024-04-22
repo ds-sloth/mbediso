@@ -259,6 +259,9 @@ int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint
                 entry_index++;
             }
 
+            if(dir->entry_count < 2)
+                return -1;
+
             // finalize the directory
             old_size += dir->stringtable_size;
             mbediso_directory_finish(dir);
