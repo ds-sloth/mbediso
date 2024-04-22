@@ -108,15 +108,21 @@ int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_siz
             diff_end = entry->subst_end;
             clip_end = true;
         }
-        else
+        else if(entry->subst_end > last_entry->subst_end)
         {
             if(diff_end == 0)
                 diff_begin = last_entry->subst_end;
 
-            if(entry->subst_end > last_entry->subst_end)
+            diff_end = entry->subst_end;
+            clip_end = true;
+        }
+        else
+        {
+            // caught an identical entry!!
+            if(diff_end == 0)
             {
-                diff_end = entry->subst_end;
-                clip_end = true;
+                free(new_stringtable);
+                return -1;
             }
         }
 
