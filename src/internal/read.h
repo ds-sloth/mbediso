@@ -13,4 +13,6 @@ struct mbediso_raw_entry;
  *
  * \returns On success or partial success, number of bytes of buffer consumed (at least 33). On total failure (the parent directory should be abandoned), returns -1.
  **/
-int mbediso_read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffer, int buffer_size);
+extern int mbediso_read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffer, int buffer_size);
+
+extern int mbediso_read_find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io);

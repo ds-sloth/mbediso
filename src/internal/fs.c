@@ -106,3 +106,110 @@ const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, c
 
     return cur_dir;
 }
+
+struct mbediso_fs_scan_stack_frame
+{
+    uint32_t dir_index;
+    uint32_t sector;
+    uint32_t length;
+    uint32_t recurse_child; // which child to expand in this step
+};
+
+int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
+{
+    if(!fs->root_dir_entry.directory || fs->root_dir_entry.length == 0 || fs->directory_count != 0)
+        return -1;
+
+    struct mbediso_fs_scan_stack_frame stack[16];
+    uint32_t stack_level = 0;
+
+    stack[stack_level].dir_index = mbediso_fs_alloc_directory(fs);
+    stack[stack_level].sector = fs->root_dir_entry.sector;
+    stack[stack_level].length = fs->root_dir_entry.length;
+    stack[stack_level].recurse_child = 0;
+
+    if(stack[stack_level].dir_index == MBEDISO_NULL_REF)
+        return -1;
+
+    while(stack_level < 16)
+    {
+        struct mbediso_fs_scan_stack_frame* const cur_frame = &stack[stack_level];
+
+        struct mbediso_directory* dir = &fs->directories[cur_frame->dir_index];
+
+        // read directory itself on first step
+        if(cur_frame->recurse_child < 2)
+        {
+            mbediso_directory_load(dir, io, cur_frame->sector, cur_frame->length);
+
+            // now, start expanding actual children
+            cur_frame->recurse_child = 2;
+        }
+
+        // done expanding children
+        if(cur_frame->recurse_child >= dir->entry_count)
+        {
+            stack_level--;
+            continue;
+        }
+
+        struct mbediso_dir_entry* cur_entry = &dir->entries[cur_frame->recurse_child];
+        cur_frame->recurse_child++;
+
+        // consider opening a new frame
+        if(cur_entry->directory)
+        {
+            // check for loops
+            uint32_t loop_level;
+            for(loop_level = 0; loop_level <= stack_level; loop_level++)
+            {
+                if(stack[loop_level].sector == cur_entry->sector)
+                    break;
+            }
+
+            // don't expand a loop...!
+            if(loop_level <= stack_level)
+            {
+                // instead, mark it properly... "SOON".
+                // should be something like setting the length of cur_entry to zero and the sector to the dir_index of the loop_level
+                continue;
+            }
+
+            // avoid overflowing the stack
+            if(stack_level + 1 >= 16)
+            {
+                // this should be a total failure
+                continue;
+            }
+
+            // check that we can alloc the directory
+            uint32_t new_dir_index = mbediso_fs_alloc_directory(fs);
+            if(new_dir_index == MBEDISO_NULL_REF)
+            {
+                // this should be a total failure
+                continue;
+            }
+
+            // (directory pointer got invalidated by allocation above)
+            dir = &fs->directories[cur_frame->dir_index];
+
+            // okay, we can expand.
+            stack_level++;
+
+            stack[stack_level].dir_index = new_dir_index;
+            stack[stack_level].recurse_child = 0;
+            stack[stack_level].sector = cur_entry->sector;
+            stack[stack_level].length = cur_entry->length;
+
+            // add reference to child directory index
+            cur_entry->length = 0;
+            cur_entry->sector = new_dir_index;
+        }
+    }
+
+    // success: add reference to root directory index
+    fs->root_dir_entry.length = 0;
+    fs->root_dir_entry.sector = stack[0].dir_index;
+
+    return 0;
+}

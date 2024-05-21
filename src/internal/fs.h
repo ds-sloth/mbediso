@@ -42,3 +42,5 @@ extern const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs
 
 extern struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
 extern void mbediso_fs_free_io(struct mbediso_fs* fs, struct mbediso_io* io);
+
+extern int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io);

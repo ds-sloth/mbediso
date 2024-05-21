@@ -9,6 +9,7 @@
 
 #include "internal/io.h"
 #include "internal/fs.h"
+#include "internal/read.h"
 
 int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint32_t length);
 int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io);
@@ -34,15 +35,11 @@ int main(int argc, char** argv)
 
     req_fn[0] = '\0';
 
-    if(find_joliet_root(&fs, io) != 0 || scan_dir(&fs, io, fs.root_dir_entry.sector, fs.root_dir_entry.length) != 0)
+    if(mbediso_read_find_joliet_root(&fs, io) != 0 || mbediso_fs_full_scan(&fs, io) != 0)
     {
         printf("Failed to load structure\n");
         return 1;
     }
-
-    // mark root directory as loaded at index 0
-    fs.root_dir_entry.sector = 0;
-    fs.root_dir_entry.length = 0;
 
     while(scanf(" %1023[^\n]", req_fn) == 1)
     {
