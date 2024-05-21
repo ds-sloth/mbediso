@@ -9,6 +9,8 @@
 
 #include "internal/util.h"
 #include "internal/directory.h"
+#include "internal/io.h"
+#include "internal/read.h"
 
 bool mbediso_directory_ctor(struct mbediso_directory* dir)
 {
@@ -182,7 +184,7 @@ const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_di
 }
 
 
-int mbediso_directory_finish(struct mbediso_directory* dir)
+static int s_mbediso_directory_finish(struct mbediso_directory* dir)
 {
     if(!dir->utf8_sorted)
         s_directory_sort_PRECOMPACT(dir);
@@ -206,6 +208,84 @@ int mbediso_directory_finish(struct mbediso_directory* dir)
         dir->entries = new_entries;
         dir->entry_capacity = dir->entry_count;
     }
+
+    return 0;
+}
+
+int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length)
+{
+    struct mbediso_raw_entry entry[2];
+
+    uint32_t entry_index = 0;
+    uint32_t offset = 0;
+
+    const uint8_t* buffer = NULL;
+    bool buffer_dirty = true;
+
+    while(offset < length)
+    {
+        if(buffer_dirty)
+            buffer = mbediso_io_read_sector(io, sector + (offset / 2048));
+
+        if(!buffer)
+            return -1;
+
+        struct mbediso_raw_entry* const cur_entry = &entry[entry_index & 1];
+
+        int ret = mbediso_read_dir_entry(cur_entry, buffer + (offset % 2048), 2048 - (offset % 2048));
+
+        if(ret < 33)
+        {
+            // any cleanup needed?
+            return -1;
+        }
+
+        buffer_dirty = ((offset % 2048) + ret >= 2048);
+        offset += ret;
+
+        if(!buffer_dirty && buffer[offset % 2048] == '\0')
+        {
+            buffer_dirty = true;
+            offset += 2048 - (offset % 2048);
+        }
+
+        // skip on partial failure
+        if(cur_entry->filename.buffer[0] == '\0')
+            continue;
+
+        if(mbediso_directory_push(dir, cur_entry))
+        {
+            // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
+            // mbediso_fs_free_directory(fs, dir);
+            return -1;
+        }
+
+        // printf("%d offset %x, length %x, filename %s\n", (int)entry[entry_index & 1].directory, entry[entry_index & 1].sector * 2048, entry[entry_index & 1].length, entry[entry_index & 1].filename.buffer);
+
+        if(entry_index > 2)
+        {
+            const uint8_t* prev_fn = entry[!(entry_index & 1)].filename.buffer;
+            const uint8_t* this_fn = cur_entry->filename.buffer;
+
+            // check sort order
+            int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct mbediso_filename));
+            if(sort_order >= 0)
+            {
+                printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
+                dir->utf8_sorted = false;
+            }
+        }
+
+        entry_index++;
+    }
+
+    if(dir->entry_count < 2)
+        return -1;
+
+    // finalize the directory
+    // old_size += dir->stringtable_size;
+    s_mbediso_directory_finish(dir);
+    // total_size += dir->stringtable_size;
 
     return 0;
 }

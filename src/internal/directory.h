@@ -5,6 +5,8 @@
 
 #include "internal/string_diff.h"
 
+struct mbediso_io;
+
 /* struct for a single filename */
 struct mbediso_filename
 {
@@ -51,5 +53,5 @@ extern void mbediso_directory_dtor(struct mbediso_directory* dir);
 extern int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
 extern const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* filename, uint32_t filename_length);
 
-/* finish the load process for a directory */
-extern int mbediso_directory_finish(struct mbediso_directory* dir);
+/* load a directory's entries from the filesystem and prepare the directory for use */
+extern int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);
