@@ -8,6 +8,7 @@ Sort order in UTF-16 =/= sort order in UTF-8 / UTF-32.
   - ./afl-fuzz -i /home/ds-sloth/random/mbediso/build/seeds/ -o /home/ds-sloth/random/mbediso/build/fuzzed -m none -S f2 -d -- /home/ds-sloth/random/mbediso/build/read @@
   - Discovered that "." ".." do not always occur. Made this an error.
   - Discovered that directory entries can be duplicated. Made this an error.
+  - Discovered that loop detection isn't working.
 
 - https://en.wikipedia.org/wiki/Red%E2%80%93black_tree
 
