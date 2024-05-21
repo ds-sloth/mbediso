@@ -10,6 +10,9 @@
 #include "internal/io.h"
 #include "internal/fs.h"
 
+int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint32_t length);
+int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io);
+
 int main(int argc, char** argv)
 {
     FILE* f = fopen(argc > 1 ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso", "rb");
