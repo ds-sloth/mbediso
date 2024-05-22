@@ -24,10 +24,11 @@ Next TODOs:
 
 Goal for today:
 - fix build (done)
-- setup the FS directory list (make FS own its directories) (somewhat)
+- setup the FS directory list (make FS own its directories) (done)
 - switch to referring to directories by index (done)
-- set up free list of directories
 - allow dir_entries to refer to directories (done)
+- set up free list of directories (won't do until start work on caching mode)
+- set up shared string table (not urgent)
 - now, we are already able to start writing an interface!
   - add lookup call (done)
   - begin setting up repo structure
@@ -46,9 +47,6 @@ TWO MODES:
   - Not terribly difficult to keep everything in single buffers by using memmove and iterating over cache entries on unload / reallocate.
   - Cache management may require some interesting heuristics
 
-- When loading fully loaded mode, load directory first, then recurse
-  - This lets us load fully, sort, compact (fully), and then recurse
-  - Also lets us reuse code better
 - In both modes, represent data as (roughly) a stack
   - Exception: during fully-loaded mode load phase, the red-black tree of unique strings must be stored elsewhere, and is highly dynamic (I think)
 - When loading, first allocate 60 entries per sector, then allocate the strings
@@ -63,3 +61,10 @@ TWO MODES:
   - Directory stack
   - (Fully-loaded mode) string table
     - Includes red-black tree during load time
+
+Refactor everything for memory management EVENTUALLY:
+- Load-time RAM:
+  - Stack for dir entries
+  - Stack for dir strings (compacted dir strings go into a totally different long-term table)
+  - Two load buffers (may be used for string processing during the finalize stage)
+  - One work buffer
