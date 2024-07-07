@@ -17,17 +17,19 @@ int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io);
 
 int main(int argc, char** argv)
 {
-    FILE* f = fopen(argc > 1 ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso", "rb");
-    if(!f)
+    const char* fn = (argc > 1) ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso";
+    if(!fn)
         return 1;
 
     struct mbediso_fs fs;
     mbediso_fs_ctor(&fs);
+    mbediso_fs_init_from_path(&fs, fn);
 
-    struct mbediso_io* io = mbediso_io_from_file(f);
+    struct mbediso_io* io = mbediso_fs_reserve_io(&fs);
     if(!io)
     {
-        fclose(f);
+        printf("Failed to open file\n");
+        mbediso_fs_dtor(&fs);
         return 1;
     }
 
@@ -39,8 +41,12 @@ int main(int argc, char** argv)
     if(mbediso_read_find_joliet_root(&fs, io) != 0 || mbediso_fs_full_scan(&fs, io) != 0)
     {
         printf("Failed to load structure\n");
+        mbediso_fs_release_io(&fs, io);
+        mbediso_fs_dtor(&fs);
         return 1;
     }
+
+    mbediso_fs_release_io(&fs, io);
 
     while(scanf(" %1023[^\n]", req_fn) == 1)
     {
@@ -70,8 +76,6 @@ int main(int argc, char** argv)
 
         req_fn[0] = '\0';
     }
-
-    mbediso_io_close(io);
 
     mbediso_fs_dtor(&fs);
 

@@ -42,6 +42,24 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
     }
 }
 
+bool mbediso_fs_init_from_path(struct mbediso_fs* fs, const char* path)
+{
+    if(fs->archive_path)
+        return false;
+
+    int len = strlen(path);
+    if(!len)
+        return false;
+
+    fs->archive_path = malloc(len + 1);
+    if(!fs->archive_path)
+        return false;
+
+    strncpy(fs->archive_path, path, len + 1);
+
+    return true;
+}
+
 uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs)
 {
     // make sure there is capacity for directory
@@ -232,7 +250,12 @@ struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
     if(!f)
         return NULL;
 
-    return mbediso_io_from_file(f);
+    struct mbediso_io* io = mbediso_io_from_file(f);
+
+    if(!io)
+        fclose(f);
+
+    return io;
 }
 
 void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
