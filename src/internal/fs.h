@@ -35,15 +35,15 @@ struct mbediso_fs
 };
 
 
-extern bool mbediso_fs_ctor(struct mbediso_fs* fs);
-extern void mbediso_fs_dtor(struct mbediso_fs* fs);
+bool mbediso_fs_ctor(struct mbediso_fs* fs);
+void mbediso_fs_dtor(struct mbediso_fs* fs);
 
-extern uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs);
-extern void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index);
+uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs);
+void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index);
 
-extern const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length);
+const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length);
 
-extern struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
-extern void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);
+struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
+void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);
 
-extern int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io);
+int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io);

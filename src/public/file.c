@@ -5,7 +5,7 @@
 #include "internal/io.h"
 #include "internal/fs.h"
 
-extern struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
+struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
 {
     const struct mbediso_dir_entry* entry = mbediso_fs_lookup(fs, filename, strlen(filename));
 

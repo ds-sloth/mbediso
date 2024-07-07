@@ -21,7 +21,7 @@ struct mbediso_io_file
     uint8_t* buffer;
 };
 
-extern struct mbediso_io* mbediso_io_from_file(FILE* file);
-extern void mbediso_io_close(struct mbediso_io* io);
+struct mbediso_io* mbediso_io_from_file(FILE* file);
+void mbediso_io_close(struct mbediso_io* io);
 
-extern const uint8_t* mbediso_io_read_sector(struct mbediso_io* io, uint32_t sector);
+const uint8_t* mbediso_io_read_sector(struct mbediso_io* io, uint32_t sector);

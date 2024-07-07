@@ -47,11 +47,11 @@ struct mbediso_directory
     bool utf8_sorted;
 };
 
-extern bool mbediso_directory_ctor(struct mbediso_directory* dir);
-extern void mbediso_directory_dtor(struct mbediso_directory* dir);
+bool mbediso_directory_ctor(struct mbediso_directory* dir);
+void mbediso_directory_dtor(struct mbediso_directory* dir);
 
-extern int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
-extern const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length);
+int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
+const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length);
 
 /* load a directory's entries from the filesystem and prepare the directory for use */
-extern int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);
+int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);

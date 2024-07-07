@@ -17,12 +17,12 @@ struct mbediso_file
     uint32_t end;
 };
 
-extern struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* pathname);
+struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* pathname);
 
-extern size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t maxnum);
+size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t maxnum);
 
-extern int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence);
+int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence);
 
-extern int64_t mbediso_fsize(struct mbediso_file* file);
+int64_t mbediso_fsize(struct mbediso_file* file);
 
-extern void mbediso_fclose(struct mbediso_file* file);
+void mbediso_fclose(struct mbediso_file* file);
