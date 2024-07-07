@@ -25,5 +25,9 @@ install(TARGETS mbediso
         ARCHIVE DESTINATION "lib"
         INCLUDES DESTINATION "include")
 
+if(NOT MSVC)
+    target_compile_options(mbediso PRIVATE -Wall -Wextra -pedantic)
+endif()
+
 add_executable(read examples/main.c)
 target_link_libraries(read PRIVATE mbediso)
