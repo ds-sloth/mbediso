@@ -16,11 +16,11 @@ int mbediso_read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffe
     if(buffer_size < 33 || buffer[0] < 33 || buffer[0] > buffer_size)
         return -1;
 
-    // check that filename is stored successfully and safely
-    // note: be permissive about filename_length, in practice allowing up to 111 UTF16 characters
-    uint8_t filename_length_bytes = buffer[32];
+    // check that name is stored successfully and safely
+    // note: be permissive about name_length, in practice allowing up to 111 UTF16 characters
+    uint8_t name_length_bytes = buffer[32];
 
-    if(buffer[0] < 33 + filename_length_bytes || filename_length_bytes > 222)
+    if(buffer[0] < 33 + name_length_bytes || name_length_bytes > 222)
         return -1;
 
     // test for all unsupported features
@@ -33,21 +33,21 @@ int mbediso_read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffe
 
     if((flags & 0xFC) || extended_attr || unit_size || interleave_gap || volume_low != 1 || volume_high)
     {
-        entry->filename.buffer[0] = '\0';
+        entry->name.buffer[0] = '\0';
         return buffer[0];
     }
 
 
-    // convert filename
-    if(filename_length_bytes == 1)
+    // convert name
+    if(name_length_bytes == 1)
     {
-        entry->filename.buffer[0] = '.';
-        entry->filename.buffer[1] = (buffer[33]) ? '.' : '\0';
-        entry->filename.buffer[2] = '\0';
+        entry->name.buffer[0] = '.';
+        entry->name.buffer[1] = (buffer[33]) ? '.' : '\0';
+        entry->name.buffer[2] = '\0';
     }
-    else if(mbediso_util_utf16be_to_utf8(entry->filename.buffer, (ptrdiff_t)sizeof(struct mbediso_filename), buffer + 33, filename_length_bytes))
+    else if(mbediso_util_utf16be_to_utf8(entry->name.buffer, (ptrdiff_t)sizeof(struct mbediso_name), buffer + 33, name_length_bytes))
     {
-        entry->filename.buffer[0] = '\0';
+        entry->name.buffer[0] = '\0';
         return buffer[0];
     }
 

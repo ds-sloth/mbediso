@@ -17,7 +17,7 @@ struct mbediso_file
     uint32_t end;
 };
 
-extern struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename);
+extern struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* pathname);
 
 extern size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t maxnum);
 
