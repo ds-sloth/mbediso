@@ -31,6 +31,7 @@ struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
     f->end = f->start + entry->length;
 
     mbediso_fseek(f, 0, MBEDISO_SEEK_SET);
+    return f;
 }
 
 int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence)
