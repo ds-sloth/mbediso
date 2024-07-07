@@ -10,6 +10,7 @@
 #include "internal/io.h"
 #include "internal/fs.h"
 #include "internal/read.h"
+#include "public/file.h"
 
 int scan_dir(struct mbediso_fs* fs, struct mbediso_io* io, uint32_t sector, uint32_t length);
 int find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io);

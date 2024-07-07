@@ -7,6 +7,9 @@
 
 struct mbediso_fs
 {
+    /* Will soon be more flexible: path to give fopen when creating a new io. If non-null, owned by the mbediso_fs object. */
+    char* archive_path;
+
     /* total memory usage and budget of the filesystem */
     uint32_t mem_usage;
     uint32_t mem_capacity;
@@ -26,9 +29,9 @@ struct mbediso_fs
     /* fixme: add a directory free list */
 
     /* stores references to directories by path; may own these references */
-    struct mbediso_pathcache_entry** pathcache_list;
-    uint32_t pathcache_list_size;
-    uint32_t pathcache_list_capacity;
+    // struct mbediso_pathcache_entry** pathcache_list;
+    // uint32_t pathcache_list_size;
+    // uint32_t pathcache_list_capacity;
 };
 
 
@@ -41,6 +44,6 @@ extern void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index)
 extern const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length);
 
 extern struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
-extern void mbediso_fs_free_io(struct mbediso_fs* fs, struct mbediso_io* io);
+extern void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);
 
 extern int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io);

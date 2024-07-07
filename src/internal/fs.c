@@ -9,11 +9,14 @@
 
 #include "internal/util.h"
 #include "internal/fs.h"
+#include "internal/io.h"
 
 bool mbediso_fs_ctor(struct mbediso_fs* fs)
 {
     if(!fs)
         return false;
+
+    fs->archive_path = NULL;
 
     fs->directories = NULL;
     fs->directory_count = 0;
@@ -31,6 +34,12 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
 {
     if(!fs)
         return;
+
+    if(fs->archive_path)
+    {
+        free(fs->archive_path);
+        fs->archive_path = NULL;
+    }
 }
 
 uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs)
@@ -212,4 +221,24 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
     fs->root_dir_entry.sector = stack[0].dir_index;
 
     return 0;
+}
+
+struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
+{
+    if(!fs || !fs->archive_path)
+        return NULL;
+
+    FILE* f = fopen(fs->archive_path, "rb");
+    if(!f)
+        return NULL;
+
+    return mbediso_io_from_file(f);
+}
+
+void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
+{
+    if(!fs || !io)
+        return;
+
+    mbediso_io_close(io);
 }
