@@ -29,14 +29,27 @@ struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
     f->fs = fs;
     f->start = entry->sector * 2048;
     f->end = f->start + entry->length;
+    f->offset = 0;
 
-    mbediso_fseek(f, 0, MBEDISO_SEEK_SET);
     return f;
 }
 
 int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence)
 {
-    return file->end - file->start;
+    int64_t try_offset = -1;
+    if(whence == MBEDISO_SEEK_SET)
+        try_offset = offset;
+    else if(whence == MBEDISO_SEEK_CUR)
+        try_offset = file->offset + offset;
+    else if(whence == MBEDISO_SEEK_END)
+        try_offset = (file->end - file->start) + offset;
+
+    if(try_offset < 0 || try_offset >= file->end - file->start)
+        return -1;
+
+    file->offset = try_offset;
+
+    return file->offset;
 }
 
 int64_t mbediso_fsize(struct mbediso_file* file)

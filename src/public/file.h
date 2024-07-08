@@ -15,6 +15,7 @@ struct mbediso_file
     struct mbediso_fs* fs;
     uint32_t start;
     uint32_t end;
+    uint32_t offset;
 };
 
 struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* pathname);
