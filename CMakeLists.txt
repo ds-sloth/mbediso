@@ -9,6 +9,7 @@ set(MBEDISO_SRC
     src/internal/string_diff.c
     src/internal/util.c
     src/public/file.c
+    src/public/dir.c
 )
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
