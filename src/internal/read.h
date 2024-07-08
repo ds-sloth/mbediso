@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+struct mbediso_fs;
+struct mbediso_io;
 struct mbediso_raw_entry;
 
 /**
