@@ -23,6 +23,7 @@ struct mbediso_raw_entry
 };
 
 /* struct for a directory entry suitable for long-term storage */
+/* if directory is set and length is zero, then the directory is loaded into the directory array and sector is an index into that array */
 struct mbediso_dir_entry
 {
     struct mbediso_string_diff name_frag;
