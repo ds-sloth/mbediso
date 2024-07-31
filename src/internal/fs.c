@@ -153,7 +153,7 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
     stack[stack_level].dir_index = mbediso_fs_alloc_directory(fs);
     stack[stack_level].sector = fs->root_dir_entry.sector;
     stack[stack_level].length = fs->root_dir_entry.length;
-    stack[stack_level].recurse_child = 0;
+    stack[stack_level].recurse_child = MBEDISO_NULL_REF;
 
     if(stack[stack_level].dir_index == MBEDISO_NULL_REF)
         return -1;
@@ -165,12 +165,12 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
         struct mbediso_directory* dir = &fs->directories[cur_frame->dir_index];
 
         // read directory itself on first step
-        if(cur_frame->recurse_child < 2)
+        if(cur_frame->recurse_child == MBEDISO_NULL_REF)
         {
             mbediso_directory_load(dir, io, cur_frame->sector, cur_frame->length);
 
             // now, start expanding actual children
-            cur_frame->recurse_child = 2;
+            cur_frame->recurse_child = 0;
         }
 
         // done expanding children
@@ -224,7 +224,7 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
             stack_level++;
 
             stack[stack_level].dir_index = new_dir_index;
-            stack[stack_level].recurse_child = 0;
+            stack[stack_level].recurse_child = MBEDISO_NULL_REF;
             stack[stack_level].sector = cur_entry->sector;
             stack[stack_level].length = cur_entry->length;
 

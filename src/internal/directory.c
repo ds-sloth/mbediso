@@ -52,12 +52,8 @@ int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_r
     if(fn_len == 0 || fn_len > 333)
         return -1;
 
-    // make sure first entry is '.', second is '..', and no others are either of these
-    if(dir->entry_count == 0 && (fn_len != 1 || raw_entry->name.buffer[0] != '.'))
-        return -1;
-    else if(dir->entry_count == 1 && (fn_len != 2 || raw_entry->name.buffer[0] != '.' || raw_entry->name.buffer[1] != '.'))
-        return -1;
-    else if(dir->entry_count >= 2 && fn_len <= 2 && raw_entry->name.buffer[0] == '.' && (fn_len == 1 || raw_entry->name.buffer[1] == '.'))
+    // make sure no entry is '.' or '..'
+    if(fn_len <= 2 && raw_entry->name.buffer[0] == '.' && (fn_len == 1 || raw_entry->name.buffer[1] == '.'))
         return -1;
 
     // make sure there is capacity for entry
@@ -141,11 +137,11 @@ static int s_directory_entry_cmp_PRECOMPACT(const void* m1, const void* m2)
 
 static void s_directory_sort_PRECOMPACT(struct mbediso_directory* dir)
 {
-    if(dir->entry_count > 2)
+    if(dir->entry_count > 0)
     {
         // WARNING: need to deadlock file open with multiple threads in cache mode
         s_sort_dir = dir;
-        qsort(dir->entries + 2, dir->entry_count - 2, sizeof(struct mbediso_dir_entry), s_directory_entry_cmp_PRECOMPACT);
+        qsort(dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), s_directory_entry_cmp_PRECOMPACT);
         s_sort_dir = NULL;
     }
 
@@ -160,7 +156,7 @@ const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_di
         return NULL;
 
     // perform binary search on directory's entries
-    uint32_t begin = 2;
+    uint32_t begin = 0;
     uint32_t end = dir->entry_count;
 
     while(begin != end)
@@ -182,7 +178,6 @@ const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_di
 
     return NULL;
 }
-
 
 static int s_mbediso_directory_finish(struct mbediso_directory* dir)
 {
@@ -253,11 +248,14 @@ int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io,
         if(cur_entry->name.buffer[0] == '\0')
             continue;
 
-        if(mbediso_directory_push(dir, cur_entry))
+        if(entry_index >= 2)
         {
-            // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
-            // mbediso_fs_free_directory(fs, dir);
-            return -1;
+            if(mbediso_directory_push(dir, cur_entry))
+            {
+                // think about how to cleanly handle full failure... if no resources are owned by stack (ideal), can simply cleanup after failure
+                // mbediso_fs_free_directory(fs, dir);
+                return -1;
+            }
         }
 
         // printf("%d offset %x, length %x, name %s\n", (int)entry[entry_index & 1].directory, entry[entry_index & 1].sector * 2048, entry[entry_index & 1].length, entry[entry_index & 1].name.buffer);
@@ -279,7 +277,7 @@ int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io,
         entry_index++;
     }
 
-    if(dir->entry_count < 2)
+    if(entry_index < 2)
         return -1;
 
     // finalize the directory
