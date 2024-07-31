@@ -35,6 +35,15 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
     if(!fs)
         return;
 
+    if(fs->directories)
+    {
+        for(uint32_t i = 0; i < fs->directory_count; i++)
+            mbediso_directory_dtor(&fs->directories[i]);
+
+        free(fs->directories);
+        fs->directories = NULL;
+    }
+
     if(fs->archive_path)
     {
         free(fs->archive_path);
