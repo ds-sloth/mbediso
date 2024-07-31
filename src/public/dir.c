@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "public/dir.h"
+#include "mbediso/dir.h"
 #include "internal/io.h"
 #include "internal/fs.h"
 #include "internal/directory.h"

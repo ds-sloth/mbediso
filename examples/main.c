@@ -7,10 +7,6 @@
 
 #include "mbediso.h"
 
-#include "public/fs.h"
-#include "public/file.h"
-#include "public/dir.h"
-
 int main(int argc, char** argv)
 {
     const char* fn = (argc > 1) ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso";

@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "public/file.h"
+#include "mbediso/file.h"
 #include "internal/io.h"
 #include "internal/fs.h"
 
