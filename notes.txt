@@ -68,3 +68,10 @@ Refactor everything for memory management EVENTUALLY:
   - Stack for dir strings (compacted dir strings go into a totally different long-term table)
   - Two load buffers (may be used for string processing during the finalize stage)
   - One work buffer
+
+
+- It should be possible to modify lz4 to include an index allowing seeking blocks (64kb chunks)
+  - zero-byte lz4 frame
+  - skippable frame incorporating index
+  - actual data frame (no dictionary, no block dependence)
+  - RAM overhead seems to be around 256kb -- probably okay for Wii if not DSi

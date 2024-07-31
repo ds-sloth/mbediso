@@ -35,7 +35,7 @@ int mbediso_closedir(struct mbediso_dir* dir)
     return 0;
 }
 
-struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
+const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
 {
     if (dir->entry_index >= dir->directory->entry_count)
         return NULL;

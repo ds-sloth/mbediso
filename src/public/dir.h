@@ -27,4 +27,4 @@ struct mbediso_dir* mbediso_opendir(struct mbediso_fs* fs, const char* name);
 
 int mbediso_closedir(struct mbediso_dir* dir);
 
-struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir);
+const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir);

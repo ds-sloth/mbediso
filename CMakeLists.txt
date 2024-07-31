@@ -10,6 +10,7 @@ set(MBEDISO_SRC
     src/internal/util.c
     src/public/file.c
     src/public/dir.c
+    src/public/fs.c
 )
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
