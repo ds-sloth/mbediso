@@ -53,11 +53,11 @@ int mbediso_read_dir_entry(struct mbediso_raw_entry* entry, const uint8_t* buffe
 
 
     // set directory flag
-    entry->directory = flags & 0x02;
+    entry->l.directory = flags & 0x02;
 
     // use little-endian copies of sector and length
-    entry->sector = buffer[ 2] * 0x00000001 + buffer[ 3] * 0x00000100 + buffer[ 4] * 0x00010000 + buffer[ 5] * 0x01000000;
-    entry->length = buffer[10] * 0x00000001 + buffer[11] * 0x00000100 + buffer[12] * 0x00010000 + buffer[13] * 0x01000000;
+    entry->l.sector = buffer[ 2] * 0x00000001 + buffer[ 3] * 0x00000100 + buffer[ 4] * 0x00010000 + buffer[ 5] * 0x01000000;
+    entry->l.length = buffer[10] * 0x00000001 + buffer[11] * 0x00000100 + buffer[12] * 0x00010000 + buffer[13] * 0x01000000;
 
 
     return buffer[0];
@@ -99,11 +99,11 @@ int mbediso_read_find_joliet_root(struct mbediso_fs* fs, struct mbediso_io* io)
     if(bytes_read < 33)
         return -2;
 
-    if(!entry.directory)
+    if(!entry.l.directory)
         return -3;
 
-    fs->root_dir_entry.sector = entry.sector;
-    fs->root_dir_entry.length = entry.length;
+    fs->root_dir_entry.sector = entry.l.sector;
+    fs->root_dir_entry.length = entry.l.length;
     fs->root_dir_entry.directory = true;
 
     return 0;

@@ -95,13 +95,12 @@ void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index)
     // TODO: free and remove references to dir
 }
 
-const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length)
+bool mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out)
 {
     const char* segment_start = path;
     const char* const path_end = path + path_length;
 
-    // currently assuming that fs is fully loaded with root at first directory index
-    const struct mbediso_dir_entry* cur_dir = &fs->root_dir_entry;
+    *out = fs->root_dir_entry;
 
     while(segment_start < path_end)
     {
@@ -113,25 +112,28 @@ const struct mbediso_dir_entry* mbediso_fs_lookup(const struct mbediso_fs* fs, c
         // seek the segment
         if(segment_start != segment_end)
         {
-            const struct mbediso_dir_entry* found = mbediso_directory_lookup(&fs->directories[cur_dir->sector], segment_start, segment_end - segment_start);
+            // check for directory that is partially / incorrectly loaded
+            if(out->length == 0 && out->sector >= fs->directory_count)
+                return false;
+            // loaded directory
+            else if(out->length == 0)
+            {
+                if(!mbediso_directory_lookup(&fs->directories[out->sector], segment_start, segment_end - segment_start, out))
+                    return false;
 
-            if(!found)
-                return NULL;
+                if(segment_end == path_end)
+                    return true;
 
-            if(segment_end == path_end)
-                return found;
-
-            // fail if got a non-directory, or if not fully loaded
-            if(!found->directory || found->length != 0 || found->sector >= fs->directory_count)
-                return NULL;
-
-            cur_dir = found;
+                // fail if got a non-directory, or if not fully loaded
+                if(!out->directory || out->length != 0 || out->sector >= fs->directory_count)
+                    return false;
+            }
         }
 
         segment_start = segment_end + 1;
     }
 
-    return cur_dir;
+    return true;
 }
 
 struct mbediso_fs_scan_stack_frame
@@ -184,13 +186,13 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
         cur_frame->recurse_child++;
 
         // consider opening a new frame
-        if(cur_entry->directory)
+        if(cur_entry->l.directory)
         {
             // check for loops
             uint32_t loop_level;
             for(loop_level = 0; loop_level <= stack_level; loop_level++)
             {
-                if(stack[loop_level].sector == cur_entry->sector)
+                if(stack[loop_level].sector == cur_entry->l.sector)
                     break;
             }
 
@@ -225,12 +227,12 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
 
             stack[stack_level].dir_index = new_dir_index;
             stack[stack_level].recurse_child = MBEDISO_NULL_REF;
-            stack[stack_level].sector = cur_entry->sector;
-            stack[stack_level].length = cur_entry->length;
+            stack[stack_level].sector = cur_entry->l.sector;
+            stack[stack_level].length = cur_entry->l.length;
 
             // add reference to child directory index
-            cur_entry->length = 0;
-            cur_entry->sector = new_dir_index;
+            cur_entry->l.length = 0;
+            cur_entry->l.sector = new_dir_index;
         }
     }
 

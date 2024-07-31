@@ -7,9 +7,11 @@
 
 struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
 {
-    const struct mbediso_dir_entry* entry = mbediso_fs_lookup(fs, filename, strlen(filename));
+    struct mbediso_location loc;
+    if(!mbediso_fs_lookup(fs, filename, strlen(filename), &loc))
+        return NULL;
 
-    if(!entry || entry->directory)
+    if(loc.directory)
         return NULL;
 
     struct mbediso_io* io = mbediso_fs_reserve_io(fs);
@@ -27,8 +29,8 @@ struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
 
     f->io = io;
     f->fs = fs;
-    f->start = entry->sector * 2048;
-    f->end = f->start + entry->length;
+    f->start = loc.sector * 2048;
+    f->end = f->start + loc.length;
     f->offset = 0;
 
     return f;

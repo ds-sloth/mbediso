@@ -92,9 +92,7 @@ int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_r
     dir->entry_count++;
 
     // copy information from raw_entry
-    entry->sector = raw_entry->sector;
-    entry->length = raw_entry->length;
-    entry->directory = raw_entry->directory;
+    entry->l = raw_entry->l;
 
     // copy name information
     entry->name_frag.last_effective_entry = -1;
@@ -148,12 +146,12 @@ static void s_directory_sort_PRECOMPACT(struct mbediso_directory* dir)
     dir->utf8_sorted = true;
 }
 
-const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length)
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out)
 {
     struct mbediso_name temp_filename;
 
     if(name_length > sizeof(temp_filename.buffer))
-        return NULL;
+        return false;
 
     // perform binary search on directory's entries
     uint32_t begin = 0;
@@ -164,19 +162,22 @@ const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_di
         uint32_t mid = begin + (end - begin) / 2;
 
         if(mbediso_string_diff_reconstruct(temp_filename.buffer, sizeof(temp_filename.buffer), dir->stringtable, dir->entries, dir->entry_count, sizeof(struct mbediso_dir_entry), mid))
-            return NULL;
+            return false;
 
         int cmp_ret = strncmp((const char*)temp_filename.buffer, (const char*)name, name_length);
 
         if(cmp_ret == 0 && (name_length == sizeof(temp_filename.buffer) || temp_filename.buffer[name_length] == '\0'))
-            return &dir->entries[mid];
+        {
+            *out = dir->entries[mid].l;
+            return true;
+        }
         else if(cmp_ret < 0)
             begin = mid + 1;
         else
             end = mid;
     }
 
-    return NULL;
+    return false;
 }
 
 static int s_mbediso_directory_finish(struct mbediso_directory* dir)

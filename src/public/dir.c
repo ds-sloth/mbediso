@@ -8,16 +8,18 @@
 
 struct mbediso_dir* mbediso_opendir(struct mbediso_fs* fs, const char* name)
 {
-    const struct mbediso_dir_entry* dir_entry  = mbediso_fs_lookup(fs, name, strlen(name));
-    if (!dir_entry
-        || !dir_entry->directory
-        || dir_entry->length != 0
-        || dir_entry->sector >= fs->directory_count)
+    struct mbediso_location loc;
+    if(!mbediso_fs_lookup(fs, name, strlen(name), &loc))
+        return NULL;
+
+    if (!loc.directory
+        || loc.length != 0
+        || loc.sector >= fs->directory_count)
     {
         return NULL;
     }
 
-    const struct mbediso_directory* directory = &fs->directories[dir_entry->sector];
+    const struct mbediso_directory* directory = &fs->directories[loc.sector];
 
     struct mbediso_dir* dir = malloc(sizeof(struct mbediso_dir));
     if (!dir)
@@ -42,7 +44,7 @@ const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
 
     const struct mbediso_dir_entry* entry = &dir->directory->entries[dir->entry_index];
 
-    dir->dirent.d_type = entry->directory ? MBEDISO_DT_DIR : MBEDISO_DT_REG;
+    dir->dirent.d_type = entry->l.directory ? MBEDISO_DT_DIR : MBEDISO_DT_REG;
 
     int name_res = mbediso_string_diff_reconstruct(
         dir->dirent.d_name,

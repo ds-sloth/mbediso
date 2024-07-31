@@ -13,23 +13,27 @@ struct mbediso_name
     uint8_t buffer[334];
 };
 
-/* struct for a raw directory entry */
-struct mbediso_raw_entry
+/* struct for the location portion of a directory entry */
+/* if directory is set and length is zero, then the directory is loaded into the directory array and sector is an index into that array */
+struct mbediso_location
 {
-    struct mbediso_name name;
     uint32_t sector;
     uint32_t length;
     bool directory;
 };
 
+/* struct for a raw directory entry */
+struct mbediso_raw_entry
+{
+    struct mbediso_name name;
+    struct mbediso_location l;
+};
+
 /* struct for a directory entry suitable for long-term storage */
-/* if directory is set and length is zero, then the directory is loaded into the directory array and sector is an index into that array */
 struct mbediso_dir_entry
 {
     struct mbediso_string_diff name_frag;
-    uint32_t sector;
-    uint32_t length;
-    bool directory;
+    struct mbediso_location l;
 };
 
 /* represents the contents of a single directory */
@@ -52,7 +56,7 @@ bool mbediso_directory_ctor(struct mbediso_directory* dir);
 void mbediso_directory_dtor(struct mbediso_directory* dir);
 
 int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
-const struct mbediso_dir_entry* mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length);
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out);
 
 /* load a directory's entries from the filesystem and prepare the directory for use */
 int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);
