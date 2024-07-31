@@ -288,3 +288,59 @@ int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io,
 
     return 0;
 }
+
+bool mbediso_directory_lookup_unloaded(struct mbediso_io* io, uint32_t sector, uint32_t length, const char* name, uint32_t name_length, struct mbediso_location* out)
+{
+    struct mbediso_raw_entry entry;
+
+    uint32_t entry_index = 0;
+    uint32_t offset = 0;
+
+    const uint8_t* buffer = NULL;
+    bool buffer_dirty = true;
+
+    while(offset < length)
+    {
+        if(buffer_dirty)
+            buffer = mbediso_io_read_sector(io, sector + (offset / 2048));
+
+        if(!buffer)
+            return false;
+
+        int ret = mbediso_read_dir_entry(&entry, buffer + (offset % 2048), 2048 - (offset % 2048));
+
+        if(ret < 33)
+        {
+            // any cleanup needed?
+            return false;
+        }
+
+        buffer_dirty = ((offset % 2048) + ret >= 2048);
+        offset += ret;
+
+        if(!buffer_dirty && buffer[offset % 2048] == '\0')
+        {
+            buffer_dirty = true;
+            offset += 2048 - (offset % 2048);
+        }
+
+        // skip on partial failure
+        if(entry.name.buffer[0] == '\0')
+            continue;
+
+        entry_index++;
+
+        if(entry_index < 2)
+            continue;
+
+        int cmp_ret = strncmp((const char*)entry.name.buffer, (const char*)name, name_length);
+
+        if(cmp_ret == 0 && (name_length == sizeof(entry.name.buffer) || entry.name.buffer[name_length] == '\0'))
+        {
+            *out = entry.l;
+            return true;
+        }
+    }
+
+    return false;
+}

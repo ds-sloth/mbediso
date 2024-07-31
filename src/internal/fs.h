@@ -43,7 +43,7 @@ bool mbediso_fs_init_from_path(struct mbediso_fs* fs, const char* path);
 uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs);
 void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index);
 
-bool mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out);
+bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out);
 
 struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
 void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);

@@ -60,3 +60,6 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
 
 /* load a directory's entries from the filesystem and prepare the directory for use */
 int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);
+
+/* fill the provided directory entry with the found directory item, for a directory which may not be loaded */
+bool mbediso_directory_lookup_unloaded(struct mbediso_io* io, uint32_t sector, uint32_t length, const char* name, uint32_t name_length, struct mbediso_location* out);

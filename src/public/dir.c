@@ -12,34 +12,68 @@ struct mbediso_dir* mbediso_opendir(struct mbediso_fs* fs, const char* name)
     if(!mbediso_fs_lookup(fs, name, strlen(name), &loc))
         return NULL;
 
-    if (!loc.directory
-        || loc.length != 0
-        || loc.sector >= fs->directory_count)
-    {
+    if(!loc.directory)
         return NULL;
-    }
 
-    const struct mbediso_directory* directory = &fs->directories[loc.sector];
+    if(loc.length == 0 && loc.sector >= fs->directory_count)
+        return NULL;
 
     struct mbediso_dir* dir = malloc(sizeof(struct mbediso_dir));
-    if (!dir)
+    if(!dir)
         return NULL;
 
+    // preloaded directory
+    if(loc.length == 0 && loc.sector < fs->directory_count)
+    {
+        dir->directory = &fs->directories[loc.sector];
+        dir->on_heap = false;
+    }
+    // need to load
+    else
+    {
+        dir->directory = malloc(sizeof(struct mbediso_directory));
+        dir->on_heap = true;
+
+        struct mbediso_io* io = NULL;
+
+        if(!dir->directory
+            || !mbediso_directory_ctor(dir->directory)
+            || (io = mbediso_fs_reserve_io(fs)) == NULL
+            || mbediso_directory_load(dir->directory, io, loc.sector, loc.length) != 0
+        )
+        {
+            mbediso_fs_release_io(fs, io);
+            mbediso_closedir(dir);
+            return NULL;
+        }
+
+        // loaded successfully, just need to clean up here
+        mbediso_fs_release_io(fs, io);
+    }
+
     dir->fs = fs;
-    dir->directory = directory;
     dir->entry_index = 0;
     return dir;
 }
 
 int mbediso_closedir(struct mbediso_dir* dir)
 {
+    if(!dir)
+        return 0;
+
+    if(dir->on_heap)
+    {
+        mbediso_directory_dtor(dir->directory);
+        free(dir->directory);
+    }
+
     free(dir);
     return 0;
 }
 
 const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
 {
-    if (dir->entry_index >= dir->directory->entry_count)
+    if(dir->entry_index >= dir->directory->entry_count)
         return NULL;
 
     const struct mbediso_dir_entry* entry = &dir->directory->entries[dir->entry_index];
@@ -55,7 +89,8 @@ const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
         sizeof(struct mbediso_dir_entry),
         dir->entry_index
     );
-    if (name_res != 0)
+
+    if(name_res != 0)
     {
         // This should be unreachable
         return NULL;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MBEDISO_DT_UKNOWN 1
 #define MBEDISO_DT_REG 2
@@ -18,9 +19,10 @@ struct mbediso_dirent
 struct mbediso_dir
 {
     struct mbediso_fs* fs;
-    const struct mbediso_directory* directory;
+    struct mbediso_directory* directory;
     struct mbediso_dirent dirent;
     uint32_t entry_index;
+    bool on_heap;
 };
 
 struct mbediso_dir* mbediso_opendir(struct mbediso_fs* fs, const char* name);

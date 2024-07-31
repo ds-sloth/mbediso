@@ -78,7 +78,7 @@ uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs)
         return MBEDISO_NULL_REF;
 
 
-    // constructor directory
+    // construct directory
     struct mbediso_directory* dir = &fs->directories[fs->directory_count];
 
     if(!mbediso_directory_ctor(dir))
@@ -95,10 +95,12 @@ void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index)
     // TODO: free and remove references to dir
 }
 
-bool mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out)
+bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out)
 {
     const char* segment_start = path;
     const char* const path_end = path + path_length;
+
+    struct mbediso_io* io = NULL;
 
     *out = fs->root_dir_entry;
 
@@ -114,25 +116,53 @@ bool mbediso_fs_lookup(const struct mbediso_fs* fs, const char* path, uint32_t p
         {
             // check for directory that is partially / incorrectly loaded
             if(out->length == 0 && out->sector >= fs->directory_count)
+            {
+                mbediso_fs_release_io(fs, io);
                 return false;
+            }
             // loaded directory
             else if(out->length == 0)
             {
                 if(!mbediso_directory_lookup(&fs->directories[out->sector], segment_start, segment_end - segment_start, out))
+                {
+                    mbediso_fs_release_io(fs, io);
+                    return false;
+                }
+            }
+            // unloaded directory
+            else
+            {
+                if(!io)
+                    io = mbediso_fs_reserve_io(fs);
+
+                if(!io)
                     return false;
 
-                if(segment_end == path_end)
-                    return true;
-
-                // fail if got a non-directory, or if not fully loaded
-                if(!out->directory || out->length != 0 || out->sector >= fs->directory_count)
+                if(!mbediso_directory_lookup_unloaded(io, out->sector, out->length, segment_start, segment_end - segment_start, out))
+                {
+                    mbediso_fs_release_io(fs, io);
                     return false;
+                }
+            }
+
+            if(segment_end == path_end)
+            {
+                mbediso_fs_release_io(fs, io);
+                return true;
+            }
+
+            // fail if got a non-directory, or if not fully loaded
+            if(!out->directory)
+            {
+                mbediso_fs_release_io(fs, io);
+                return false;
             }
         }
 
         segment_start = segment_end + 1;
     }
 
+    mbediso_fs_release_io(fs, io);
     return true;
 }
 
