@@ -79,7 +79,7 @@ Refactor everything for memory management EVENTUALLY:
 
 
 Immediate TODO:
-(1) get rid of relative dir entries
-(2) make FS work correctly even if never loaded
+(1) get rid of relative dir entries (done)
+(2) make FS work correctly even if never loaded (done)
 (3) make the I/O pool!
 (4) make the shared string table

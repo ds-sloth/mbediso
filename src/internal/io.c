@@ -45,7 +45,7 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector)
 
         if(io->filepos != target_pos)
         {
-            printf("seeking %lx...\n", target_pos);
+            // printf("seeking %lx...\n", target_pos);
 
             if(fseek(io->file, target_pos, SEEK_SET))
             {
