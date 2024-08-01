@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -8,3 +12,7 @@
 #include "mbediso/dir.h"
 #include "mbediso/file.h"
 #include "mbediso/fs.h"
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
