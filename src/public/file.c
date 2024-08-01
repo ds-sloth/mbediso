@@ -64,3 +64,8 @@ void mbediso_fclose(struct mbediso_file* file)
     mbediso_fs_release_io(file->fs, file->io);
     free(file);
 }
+
+struct mbediso_fs* mbediso_file_fs(struct mbediso_file* file)
+{
+    return file->fs;
+}

@@ -27,3 +27,5 @@ int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence);
 int64_t mbediso_fsize(struct mbediso_file* file);
 
 void mbediso_fclose(struct mbediso_file* file);
+
+struct mbediso_fs* mbediso_file_fs(struct mbediso_file* file);
