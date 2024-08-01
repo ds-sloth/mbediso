@@ -99,3 +99,15 @@ const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
     dir->entry_index++;
     return &dir->dirent;
 }
+
+int mbediso_exists(struct mbediso_fs* fs, const char* name)
+{
+    struct mbediso_location loc;
+    if(!mbediso_fs_lookup(fs, name, &loc))
+        return 0;
+
+    if(loc.directory)
+        return MBEDISO_DT_DIR;
+    else
+        return MBEDISO_DT_REG;
+}
