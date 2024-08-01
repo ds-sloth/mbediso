@@ -8,7 +8,7 @@
 struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
 {
     struct mbediso_location loc;
-    if(!mbediso_fs_lookup(fs, filename, strlen(filename), &loc))
+    if(!mbediso_fs_lookup(fs, filename, &loc))
         return NULL;
 
     if(loc.directory)

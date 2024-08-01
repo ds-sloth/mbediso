@@ -9,7 +9,7 @@
 struct mbediso_dir* mbediso_opendir(struct mbediso_fs* fs, const char* name)
 {
     struct mbediso_location loc;
-    if(!mbediso_fs_lookup(fs, name, strlen(name), &loc))
+    if(!mbediso_fs_lookup(fs, name, &loc))
         return NULL;
 
     if(!loc.directory)

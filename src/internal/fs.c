@@ -104,20 +104,19 @@ void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index)
     // TODO: free and remove references to dir
 }
 
-bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, uint32_t path_length, struct mbediso_location* out)
+bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_location* out)
 {
     const char* segment_start = path;
-    const char* const path_end = path + path_length;
 
     struct mbediso_io* io = NULL;
 
     *out = fs->root_dir_entry;
 
-    while(segment_start < path_end)
+    while(*segment_start != '\0')
     {
         const char* segment_end = segment_start;
 
-        while(*segment_end != '/' && segment_end < path_end)
+        while(*segment_end != '/' && *segment_end != '\0')
             segment_end++;
 
         // seek the segment
@@ -154,7 +153,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, uint32_t path_le
                 }
             }
 
-            if(segment_end == path_end)
+            if(*segment_end == '\0')
             {
                 mbediso_fs_release_io(fs, io);
                 return true;
