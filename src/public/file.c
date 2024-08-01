@@ -36,6 +36,22 @@ struct mbediso_file* mbediso_fopen(struct mbediso_fs* fs, const char* filename)
     return f;
 }
 
+size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t maxnum)
+{
+    size_t bytes = size * maxnum;
+
+    if(file->offset >= file->end - file->start)
+        return 0;
+
+    if(bytes > file->end - (file->start + file->offset))
+        bytes = file->end - (file->start + file->offset);
+
+    size_t ret = mbediso_io_read_direct(file->io, ptr, file->offset + file->start, bytes);
+    file->offset += bytes;
+
+    return ret;
+}
+
 int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence)
 {
     int64_t try_offset = -1;
