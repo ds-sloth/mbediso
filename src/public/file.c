@@ -47,9 +47,11 @@ size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t m
         bytes = file->end - (file->start + file->offset);
 
     size_t ret = mbediso_io_read_direct(file->io, ptr, file->offset + file->start, bytes);
-    file->offset += bytes;
+    // ignore incompletely-read members
+    ret -= ret % size;
+    file->offset += ret;
 
-    return ret;
+    return ret / size;
 }
 
 int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence)
@@ -62,7 +64,7 @@ int64_t mbediso_fseek(struct mbediso_file* file, int64_t offset, int whence)
     else if(whence == MBEDISO_SEEK_END)
         try_offset = (file->end - file->start) + offset;
 
-    if(try_offset < 0 || try_offset >= file->end - file->start)
+    if(try_offset < 0 || try_offset > file->end - file->start)
         return -1;
 
     file->offset = try_offset;
