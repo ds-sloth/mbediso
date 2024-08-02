@@ -190,19 +190,37 @@ static int s_mbediso_directory_finish(struct mbediso_directory* dir)
         return ret;
 
     // shrink stringtable to fit
-    uint8_t* shrunken_stringtable = realloc(dir->stringtable, dir->stringtable_size);
-    if(shrunken_stringtable)
+    if(dir->stringtable_size > 0)
     {
-        dir->stringtable = shrunken_stringtable;
-        dir->stringtable_capacity = dir->stringtable_size;
+        uint8_t* shrunken_stringtable = realloc(dir->stringtable, dir->stringtable_size);
+        if(shrunken_stringtable)
+        {
+            dir->stringtable = shrunken_stringtable;
+            dir->stringtable_capacity = dir->stringtable_size;
+        }
+    }
+    else
+    {
+        free(dir->stringtable);
+        dir->stringtable = NULL;
+        dir->stringtable_capacity = 0;
     }
 
     // shrink entry list to fit
-    struct mbediso_dir_entry* new_entries = realloc(dir->entries, dir->entry_count * sizeof(struct mbediso_dir_entry));
-    if(new_entries)
+    if(dir->entry_count > 0)
     {
-        dir->entries = new_entries;
-        dir->entry_capacity = dir->entry_count;
+        struct mbediso_dir_entry* new_entries = realloc(dir->entries, dir->entry_count * sizeof(struct mbediso_dir_entry));
+        if(new_entries)
+        {
+            dir->entries = new_entries;
+            dir->entry_capacity = dir->entry_count;
+        }
+    }
+    else
+    {
+        free(dir->entries);
+        dir->entries = NULL;
+        dir->entry_capacity = 0;
     }
 
     return 0;
