@@ -124,6 +124,9 @@ int mbediso_string_diff_compact(uint8_t** stringtable, uint32_t* stringtable_siz
                 free(new_stringtable);
                 return -1;
             }
+            // ends at same time as entry
+            else if(diff_end == entry->subst_end)
+                clip_end = true;
         }
 
         // now that last entry has been checked, apply the clipping to it
