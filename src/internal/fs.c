@@ -11,6 +11,9 @@
 #include "internal/fs.h"
 #include "internal/io.h"
 
+struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
+void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);
+
 bool mbediso_fs_ctor(struct mbediso_fs* fs)
 {
     if(!fs)
@@ -26,6 +29,12 @@ bool mbediso_fs_ctor(struct mbediso_fs* fs)
     fs->root_dir_entry.sector = 0;
     fs->root_dir_entry.length = 800;
     fs->root_dir_entry.directory = true;
+
+    /* tracks the allocated and used IO instances */
+    fs->io_pool = NULL;
+    fs->io_pool_used = 0;
+    fs->io_pool_size = 0;
+    fs->io_pool_capacity = 0;
 
     return true;
 }
@@ -48,6 +57,20 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
     {
         free(fs->archive_path);
         fs->archive_path = NULL;
+    }
+
+    if(fs->io_pool)
+    {
+        if(fs->io_pool_used > 0)
+        {
+            // big problem
+        }
+
+        for(uint32_t i = 0; i < fs->io_pool_size; i++)
+            mbediso_io_close(fs->io_pool[i]);
+
+        free(fs->io_pool);
+        fs->io_pool = NULL;
     }
 }
 
@@ -281,7 +304,7 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
     return 0;
 }
 
-struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
+struct mbediso_io* mbediso_fs_reserve_io_priv(struct mbediso_fs* fs)
 {
     if(!fs || !fs->archive_path)
         return NULL;
@@ -298,10 +321,57 @@ struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
     return io;
 }
 
+struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
+{
+    if(!fs)
+        return NULL;
+
+    // FIXME: should lock here
+
+    if(fs->io_pool_size > fs->io_pool_used)
+        return fs->io_pool[fs->io_pool_used++];
+
+    if(fs->io_pool_size + 1 > fs->io_pool_capacity)
+    {
+        size_t new_capacity = mbediso_util_first_pow2(fs->io_pool_capacity + 1);
+        struct mbediso_io** new_io_pool = realloc(fs->io_pool, new_capacity * sizeof(struct mbediso_io*));
+        if(new_io_pool)
+        {
+            fs->io_pool = new_io_pool;
+            fs->io_pool_capacity = new_capacity;
+        }
+    }
+
+    if(fs->io_pool_size + 1 > fs->io_pool_capacity)
+        return NULL;
+
+    struct mbediso_io* io = mbediso_fs_reserve_io_priv(fs);
+    if(!io)
+        return NULL;
+
+    fs->io_pool[fs->io_pool_size++] = io;
+    fs->io_pool_used++;
+
+    return io;
+}
+
 void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
 {
     if(!fs || !io)
         return;
 
-    mbediso_io_close(io);
+    // FIXME: should lock here
+
+    for(uint32_t i = 0; i < fs->io_pool_used; i++)
+    {
+        if(fs->io_pool[i] == io)
+        {
+            fs->io_pool_used--;
+            fs->io_pool[i] = fs->io_pool[fs->io_pool_used];
+            fs->io_pool[fs->io_pool_used] = io;
+            return;
+        }
+    }
+
+    // if we got here, this is a big problem
 }

@@ -24,6 +24,12 @@ struct mbediso_fs
     uint32_t directory_count;
     uint32_t directory_capacity;
 
+    /* tracks the allocated and used IO instances */
+    struct mbediso_io** io_pool;
+    uint32_t io_pool_used;
+    uint32_t io_pool_size;
+    uint32_t io_pool_capacity;
+
     struct mbediso_location root_dir_entry;
 
     /* fixme: add a directory free list */
