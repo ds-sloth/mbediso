@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     if(!fn)
         return 1;
 
-    struct mbediso_fs* fs = mbediso_openfs_file(fn, false);
+    struct mbediso_fs* fs = mbediso_openfs_file(fn, true);
 
     if(!fs)
     {
