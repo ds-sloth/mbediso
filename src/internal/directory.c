@@ -146,7 +146,8 @@ static void s_directory_sort_PRECOMPACT(struct mbediso_directory* dir)
     dir->utf8_sorted = true;
 }
 
-bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out)
+#if 0
+static bool mbediso_directory_safe_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out)
 {
     struct mbediso_name temp_filename;
 
@@ -175,6 +176,127 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
             begin = mid + 1;
         else
             end = mid;
+    }
+
+    return false;
+}
+#endif
+
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out)
+{
+    struct mbediso_name temp_filename;
+
+    if(name_length > sizeof(temp_filename.buffer))
+        return false;
+
+    // perform binary search on directory's entries
+    uint32_t begin_ge_end = 0;
+    uint32_t begin = 0;
+    uint32_t end = dir->entry_count;
+    uint32_t end_le_end = 0;
+
+    while(begin < end)
+    {
+        uint32_t mid = begin + (end - begin) / 2;
+
+        uint32_t cmp_char = begin_ge_end;
+        if(end_le_end < cmp_char)
+            cmp_char = end_le_end;
+
+        int cmp = 0;
+        uint32_t effective_entry = mid;
+        // bool no_pre_substs = true;
+
+        while(cmp_char <= name_length)
+        {
+            uint32_t valid_to = name_length + 1;
+
+            const struct mbediso_string_diff* entry;
+            effective_entry = mid;
+            // no_pre_substs = true;
+
+            // find the entry that sets cmp_char
+            do
+            {
+                entry = (const struct mbediso_string_diff*)(&dir->entries[effective_entry]);
+
+                if(entry->subst_end > cmp_char || entry->clip_end)
+                {
+                    if(entry->subst_begin <= cmp_char)
+                    {
+                        if(entry->subst_end < valid_to)
+                            valid_to = entry->subst_end;
+                        break;
+                    }
+
+                    if(entry->subst_begin < valid_to)
+                        valid_to = entry->subst_begin;
+                }
+                // else
+                //     no_pre_substs = false;
+
+                // follow effective entry pointers
+                effective_entry = entry->last_effective_entry;
+            } while(effective_entry < end && valid_to > cmp_char);
+
+            // the string ends before cmp_char
+            if(valid_to <= cmp_char)
+            {
+                // mid is less than if it ends before the requested string
+                if(cmp_char < name_length)
+                    cmp = -1;
+                break;
+            }
+
+            // if effective_entry is before begin, we already know the comparison must be less than.... think about this
+            // if(effective_entry < begin && no_pre_substs)
+            // {
+            //     cmp_char = valid_to - 1;
+            //     cmp = -1;
+            //     break;
+            // }
+
+            // do the comparison
+            const char* cmp_string = (const char*)&(dir->stringtable[cmp_char - entry->subst_begin + entry->subst_table_offset]);
+            while(cmp_char < valid_to)
+            {
+                if(cmp_char == name_length || *cmp_string > name[cmp_char])
+                {
+                    cmp = 1;
+                    break;
+                }
+                else if(*cmp_string < name[cmp_char])
+                {
+                    cmp = -1;
+                    break;
+                }
+
+                cmp_char++;
+                cmp_string++;
+            }
+
+            // there was an unequal compare
+            if(cmp != 0)
+                break;
+        }
+
+        if(cmp == 0)
+        {
+            *out = dir->entries[mid].l;
+            return true;
+        }
+        else if(cmp < 0)
+        {
+            begin = mid + 1;
+            begin_ge_end = cmp_char;
+        }
+        else
+        {
+            end = mid;
+            // if(no_pre_substs)
+            //     end = effective_entry;
+            end_le_end = cmp_char;
+        }
     }
 
     return false;
