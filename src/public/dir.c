@@ -80,21 +80,21 @@ const struct mbediso_dirent* mbediso_readdir(struct mbediso_dir* dir)
 
     dir->dirent.d_type = entry->l.directory ? MBEDISO_DT_DIR : MBEDISO_DT_REG;
 
-    int name_res = mbediso_string_diff_reconstruct(
-        dir->dirent.d_name,
-        sizeof(dir->dirent.d_name),
-        dir->directory->stringtable,
-        dir->directory->entries,
-        dir->directory->entry_count,
-        sizeof(struct mbediso_dir_entry),
-        dir->entry_index
-    );
+    // update the entry name
+    const struct mbediso_string_diff* diff = &entry->name_frag;
 
-    if(name_res != 0)
+    if(diff->subst_end >= sizeof(dir->dirent.d_name))
     {
-        // This should be unreachable
+        // this should be unreachable
         return NULL;
     }
+
+    const char* diff_str = (const char*)(dir->directory->stringtable + diff->subst_table_offset);
+    for(unsigned i = diff->subst_begin; i < diff->subst_end; ++i)
+        dir->dirent.d_name[i] = *(diff_str++);
+
+    if(diff->clip_end)
+        dir->dirent.d_name[diff->subst_end] = '\0';
 
     dir->entry_index++;
     return &dir->dirent;
