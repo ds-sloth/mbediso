@@ -22,6 +22,18 @@ int mbediso_util_utf16be_to_utf8(uint8_t* restrict dest, ptrdiff_t capacity, con
     {
         uint32_t codepoint = 0;
 
+        // fast path for ASCII
+        if(!src[offset] && src[offset + 1] < 0x80)
+        {
+            capacity -= 1;
+            if(capacity <= 0)
+                return -1;
+
+            *(dest++) = src[offset + 1];
+            offset += 2;
+            continue;
+        }
+
         uint32_t ucs2 = (uint32_t)src[offset] * 256 + (uint32_t)src[offset + 1];
         offset += 2;
 
