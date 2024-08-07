@@ -182,12 +182,9 @@ static bool mbediso_directory_safe_lookup(const struct mbediso_directory* dir, c
 }
 #endif
 
-bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out)
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* _name, uint32_t name_length, struct mbediso_location* out)
 {
-    struct mbediso_name temp_filename;
-
-    if(name_length > sizeof(temp_filename.buffer))
-        return false;
+    const uint8_t* name = (const uint8_t*)_name;
 
     // perform binary search on directory's entries
     uint32_t begin_ge_end = 0;
@@ -205,7 +202,6 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
 
         int cmp = 0;
         uint32_t effective_entry = mid;
-        // bool no_pre_substs = true;
 
         while(cmp_char <= name_length)
         {
@@ -213,7 +209,6 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
 
             const struct mbediso_string_diff* entry;
             effective_entry = mid;
-            // no_pre_substs = true;
 
             // find the entry that sets cmp_char
             do
@@ -232,8 +227,6 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
                     if(entry->subst_begin < valid_to)
                         valid_to = entry->subst_begin;
                 }
-                // else
-                //     no_pre_substs = false;
 
                 // follow effective entry pointers
                 effective_entry = entry->last_effective_entry;
@@ -248,32 +241,33 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
                 break;
             }
 
-            // if effective_entry is before begin, we already know the comparison must be less than.... think about this
-            // if(effective_entry < begin && no_pre_substs)
-            // {
-            //     cmp_char = valid_to - 1;
-            //     cmp = -1;
-            //     break;
-            // }
+            bool extends_past = false;
+            if(valid_to > name_length)
+            {
+                extends_past = true;
+                valid_to = name_length;
+            }
 
             // do the comparison
-            const char* cmp_string = (const char*)&(dir->stringtable[cmp_char - entry->subst_begin + entry->subst_table_offset]);
+            const uint8_t* cmp_string = dir->stringtable - entry->subst_begin + entry->subst_table_offset;
             while(cmp_char < valid_to)
             {
-                if(cmp_char == name_length || *cmp_string > name[cmp_char])
+                if(cmp_string[cmp_char] > name[cmp_char])
                 {
                     cmp = 1;
                     break;
                 }
-                else if(*cmp_string < name[cmp_char])
+                else if(cmp_string[cmp_char] < name[cmp_char])
                 {
                     cmp = -1;
                     break;
                 }
 
                 cmp_char++;
-                cmp_string++;
             }
+
+            if(cmp == 0 && extends_past)
+                cmp = 1;
 
             // there was an unequal compare
             if(cmp != 0)
@@ -293,8 +287,6 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* n
         else
         {
             end = mid;
-            // if(no_pre_substs)
-            //     end = effective_entry;
             end_le_end = cmp_char;
         }
     }
@@ -410,7 +402,7 @@ int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io,
             int sort_order = strncmp((const char*)prev_fn, (const char*)this_fn, sizeof(struct mbediso_name));
             if(sort_order >= 0)
             {
-                printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
+                // printf("Unsorted at [%s] [%s]\n", prev_fn, this_fn);
                 dir->utf8_sorted = false;
             }
         }
