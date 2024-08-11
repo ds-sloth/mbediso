@@ -5,10 +5,13 @@
 
 #include "internal/directory.h"
 
+struct mbediso_lz4_header;
+
 struct mbediso_fs
 {
     /* Will soon be more flexible: path to give fopen when creating a new io. If non-null, owned by the mbediso_fs object. */
     char* archive_path;
+    struct mbediso_lz4_header* lz4_header;
 
     /* total memory usage and budget of the filesystem */
     uint32_t mem_usage;

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.2...3.5)
 
+include(TestBigEndian)
+
 if(POLICY CMP0069) # Allow CMAKE_INTERPROCEDURAL_OPTIMIZATION (lto) to be set
     cmake_policy(SET CMP0069 NEW)
 endif()
@@ -13,6 +15,7 @@ set(MBEDISO_SRC
     src/internal/read.c
     src/internal/string_diff.c
     src/internal/util.c
+    src/internal/lz4_header.c
     src/public/file.c
     src/public/dir.c
     src/public/fs.c
@@ -21,6 +24,15 @@ set(MBEDISO_SRC
 add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
+
+test_big_endian(MBEDISO_BIG_ENDIAN)
+if(MBEDISO_BIG_ENDIAN)
+    target_compile_definitions(mbediso PRIVATE -DMBEDISO_BIG_ENDIAN=1)
+else()
+    target_compile_definitions(mbediso PRIVATE -DMBEDISO_BIG_ENDIAN=0)
+endif()
+
+target_link_libraries(mbediso PRIVATE lz4_static)
 
 target_include_directories(mbediso PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -37,6 +49,8 @@ if(NOT MSVC)
     target_compile_options(mbediso PRIVATE -Wall -Wextra -pedantic)
 endif()
 
+
+# example utility to allow user to read from an ISO
 add_executable(read examples/main.c)
 target_link_libraries(read PRIVATE mbediso)
 

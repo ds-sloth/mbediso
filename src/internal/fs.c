@@ -10,9 +10,7 @@
 #include "internal/util.h"
 #include "internal/fs.h"
 #include "internal/io.h"
-
-struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs);
-void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io);
+#include "internal/lz4_header.h"
 
 bool mbediso_fs_ctor(struct mbediso_fs* fs)
 {
@@ -20,6 +18,7 @@ bool mbediso_fs_ctor(struct mbediso_fs* fs)
         return false;
 
     fs->archive_path = NULL;
+    fs->lz4_header = NULL;
 
     fs->directories = NULL;
     fs->directory_count = 0;
@@ -72,7 +71,15 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
         free(fs->io_pool);
         fs->io_pool = NULL;
     }
+
+    if(fs->lz4_header)
+    {
+        mbediso_lz4_header_free(fs->lz4_header);
+        fs->lz4_header = NULL;
+    }
 }
+
+static void s_mbediso_fs_adopt_fp(struct mbediso_fs* fs, FILE* fp);
 
 bool mbediso_fs_init_from_path(struct mbediso_fs* fs, const char* path)
 {
@@ -88,6 +95,14 @@ bool mbediso_fs_init_from_path(struct mbediso_fs* fs, const char* path)
         return false;
 
     strncpy(fs->archive_path, path, len + 1);
+
+    /* detect lz4 archive */
+    FILE* f = fopen(fs->archive_path, "rb");
+    if(f)
+    {
+        fs->lz4_header = mbediso_lz4_header_load(f);
+        s_mbediso_fs_adopt_fp(fs, f);
+    }
 
     return true;
 }
@@ -304,24 +319,30 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
     return 0;
 }
 
-struct mbediso_io* mbediso_fs_reserve_io_priv(struct mbediso_fs* fs)
+static struct mbediso_io* s_mbediso_fs_construct_io(struct mbediso_fs* fs, FILE* f)
 {
     if(!fs || !fs->archive_path)
         return NULL;
 
-    FILE* f = fopen(fs->archive_path, "rb");
+    FILE* f_to_close = NULL;
+    if(!f)
+    {
+        f = fopen(fs->archive_path, "rb");
+        f_to_close = f;
+    }
+
     if(!f)
         return NULL;
 
-    struct mbediso_io* io = mbediso_io_from_file(f);
+    struct mbediso_io* io = mbediso_io_from_file(f, fs->lz4_header);
 
-    if(!io)
-        fclose(f);
+    if(!io && f_to_close)
+        fclose(f_to_close);
 
     return io;
 }
 
-struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
+static struct mbediso_io* s_mbediso_fs_reserve_io_fp(struct mbediso_fs* fs, FILE* fp)
 {
     if(!fs)
         return NULL;
@@ -345,7 +366,7 @@ struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
     if(fs->io_pool_size + 1 > fs->io_pool_capacity)
         return NULL;
 
-    struct mbediso_io* io = mbediso_fs_reserve_io_priv(fs);
+    struct mbediso_io* io = s_mbediso_fs_construct_io(fs, fp);
     if(!io)
         return NULL;
 
@@ -353,6 +374,11 @@ struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
     fs->io_pool_used++;
 
     return io;
+}
+
+struct mbediso_io* mbediso_fs_reserve_io(struct mbediso_fs* fs)
+{
+    return s_mbediso_fs_reserve_io_fp(fs, NULL);
 }
 
 void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
@@ -374,4 +400,17 @@ void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
     }
 
     // if we got here, this is a big problem
+}
+
+/* the purpose of this function is to adopt the file pointer used for lz4 detection and initialization into the IO pool */
+static void s_mbediso_fs_adopt_fp(struct mbediso_fs* fs, FILE* fp)
+{
+    if(!fp)
+        return;
+
+    struct mbediso_io* io = s_mbediso_fs_reserve_io_fp(fs, fp);
+    if(io)
+        mbediso_fs_release_io(fs, io);
+    else
+        fclose(fp);
 }
