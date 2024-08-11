@@ -43,6 +43,9 @@ size_t mbediso_fread(struct mbediso_file* file, void* ptr, size_t size, size_t m
     if(file->offset >= file->end - file->start)
         return 0;
 
+    if(size * maxnum == 0)
+        return 0;
+
     if(bytes > file->end - (file->start + file->offset))
         bytes = file->end - (file->start + file->offset);
 
