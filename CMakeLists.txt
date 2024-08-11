@@ -39,3 +39,11 @@ endif()
 
 add_executable(read examples/main.c)
 target_link_libraries(read PRIVATE mbediso)
+
+
+# lz4 pack command line util
+project(lz4_pack VERSION 0.0 LANGUAGES CXX)
+
+add_executable(lz4_pack util/lz4_pack.cpp)
+
+target_link_libraries(lz4_pack PRIVATE lz4_static)
