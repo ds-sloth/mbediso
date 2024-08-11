@@ -18,6 +18,8 @@ set(MBEDISO_SRC
     src/public/fs.c
 )
 
+add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
+
 add_library(mbediso STATIC ${MBEDISO_SRC})
 
 target_include_directories(mbediso PRIVATE
