@@ -223,7 +223,7 @@ int main(int argc, char** argv)
     FILE* inf = fopen(infn, "rb");
     FILE* outf = fopen(outfn.c_str(), "wb");
 
-    int ret = !compress(outf, inf, 32*1024, want_big_endian);
+    int ret = !compress(outf, inf, 4*1024, want_big_endian);
 
     fclose(inf);
     fclose(outf);
