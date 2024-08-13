@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv)
 {
-    const char* fn = (argc > 1) ? argv[1] : "thextech-super-talking-time-bros-1n2-v1-5.iso";
+    const char* fn = (argc > 1) ? argv[1] : NULL;
     if(!fn)
         return 1;
 
