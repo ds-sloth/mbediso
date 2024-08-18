@@ -160,9 +160,11 @@ bool LZ4Pack::compress(FILE* outf, FILE* inf, size_t block_size, bool big_endian
 
             XXH32_update(hash_state, in_block, to_compress);
 
-            auto to_write = LZ4_compress_HC(in_block, out_block, to_compress, out_block_max, LZ4HC_CLEVEL_MAX);
-            if(to_write <= 0)
+            auto _to_write = LZ4_compress_HC(in_block, out_block, to_compress, out_block_max, LZ4HC_CLEVEL_MAX);
+            if(_to_write <= 0)
                 break;
+
+            size_t to_write = (size_t)_to_write;
 
             uint32_t block_dest = (uint32_t)ftell(outf);
             write_uint32(&mbediso_block_offsets[block_index * 4], block_dest, big_endian);
