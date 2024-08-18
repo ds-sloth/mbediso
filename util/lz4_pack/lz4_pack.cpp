@@ -25,7 +25,9 @@
 #define XXH_NAMESPACE LZ4_
 #include "xxhash.h"
 
-void write_uint32_le(uint8_t* dest, uint32_t value)
+#include "lz4_pack.h"
+
+static void write_uint32_le(uint8_t* dest, uint32_t value)
 {
     dest[0] = (uint8_t)(value >>  0);
     dest[1] = (uint8_t)(value >>  8);
@@ -33,7 +35,7 @@ void write_uint32_le(uint8_t* dest, uint32_t value)
     dest[3] = (uint8_t)(value >> 24);
 }
 
-void write_uint32_be(uint8_t* dest, uint32_t value)
+static void write_uint32_be(uint8_t* dest, uint32_t value)
 {
     dest[0] = (uint8_t)(value >> 24);
     dest[1] = (uint8_t)(value >> 16);
@@ -41,7 +43,7 @@ void write_uint32_be(uint8_t* dest, uint32_t value)
     dest[3] = (uint8_t)(value >>  0);
 }
 
-inline void write_uint32(uint8_t* dest, uint32_t value, bool big_endian)
+static inline void write_uint32(uint8_t* dest, uint32_t value, bool big_endian)
 {
     if(big_endian)
         write_uint32_be(dest, value);
@@ -49,7 +51,7 @@ inline void write_uint32(uint8_t* dest, uint32_t value, bool big_endian)
         write_uint32_le(dest, value);
 }
 
-bool compress(FILE* outf, FILE* inf, size_t block_size, bool big_endian)
+bool LZ4Pack::compress(FILE* outf, FILE* inf, size_t block_size, bool big_endian)
 {
     if(!outf || !inf)
         return false;
@@ -215,37 +217,4 @@ bool compress(FILE* outf, FILE* inf, size_t block_size, bool big_endian)
 
 
     return success;
-}
-
-int main(int argc, char** argv)
-{
-    if(argc < 2)
-        return -1;
-
-    bool want_big_endian = false;
-    if(argv[1][0] == '-' && argv[1][1] == 'b' && argv[1][2] == '\0')
-    {
-        want_big_endian = true;
-        argc--;
-        if(argc < 2)
-            return -1;
-        argv[1] = argv[2];
-    }
-
-    if(argc != 2)
-        return -1;
-
-    const char* infn = argv[1];
-    std::string outfn = infn;
-    outfn += ".lz4";
-
-    FILE* inf = fopen(infn, "rb");
-    FILE* outf = fopen(outfn.c_str(), "wb");
-
-    int ret = !compress(outf, inf, 4*1024, want_big_endian);
-
-    fclose(inf);
-    fclose(outf);
-
-    return ret;
 }

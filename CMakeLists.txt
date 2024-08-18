@@ -58,6 +58,9 @@ target_link_libraries(read PRIVATE mbediso)
 # lz4 pack command line util
 project(lz4_pack VERSION 0.0 LANGUAGES CXX)
 
-add_executable(lz4_pack util/lz4_pack.cpp)
+add_library(lz4_pack_static util/lz4_pack/lz4_pack.cpp)
+target_include_directories(lz4_pack_static PUBLIC util/lz4_pack/include)
+target_link_libraries(lz4_pack_static PUBLIC lz4_static)
 
-target_link_libraries(lz4_pack PRIVATE lz4_static)
+add_executable(lz4_pack_cli util/lz4_pack/main.cpp)
+target_link_libraries(lz4_pack_cli PRIVATE lz4_pack_static)
