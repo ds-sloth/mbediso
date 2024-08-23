@@ -75,7 +75,7 @@ bool mbediso_directory_ctor(struct mbediso_directory* dir);
 void mbediso_directory_dtor(struct mbediso_directory* dir);
 
 int mbediso_directory_push(struct mbediso_directory* dir, const struct mbediso_raw_entry* entry);
-bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location* out);
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* name, uint32_t name_length, struct mbediso_location** out);
 
 /* load a directory's entries from the filesystem and prepare the directory for use */
 int mbediso_directory_load(struct mbediso_directory* dir, struct mbediso_io* io, uint32_t sector, uint32_t length);

@@ -201,7 +201,7 @@ static bool mbediso_directory_safe_lookup(const struct mbediso_directory* dir, c
 }
 #endif
 
-bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* _name, uint32_t name_length, struct mbediso_location* out)
+bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* _name, uint32_t name_length, struct mbediso_location** out)
 {
     const uint8_t* name = (const uint8_t*)_name;
 
@@ -295,7 +295,7 @@ bool mbediso_directory_lookup(const struct mbediso_directory* dir, const char* _
 
         if(cmp == 0)
         {
-            *out = dir->entries[mid].l;
+            *out = &dir->entries[mid].l;
             return true;
         }
         else if(cmp < 0)

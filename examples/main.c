@@ -32,7 +32,7 @@ int main(int argc, char** argv)
     if(!fn)
         return 1;
 
-    struct mbediso_fs* fs = mbediso_openfs_file(fn, true);
+    struct mbediso_fs* fs = mbediso_openfs_file(fn, false);
 
     if(!fs)
     {
@@ -46,6 +46,12 @@ int main(int argc, char** argv)
 
     while(scanf(" %1023[^\n]", req_fn) == 1)
     {
+        if(strcmp(req_fn, "<scan>") == 0)
+        {
+            mbediso_scanfs(fs);
+            continue;
+        }
+
         struct mbediso_file* f = mbediso_fopen(fs, req_fn);
         if(f)
         {

@@ -71,7 +71,7 @@ int mbediso_scanfs(struct mbediso_fs* fs)
         return -1;
 
     // already loaded? no problem!
-    if(fs->root_dir_entry.length == 0)
+    if(fs->fully_scanned)
         return 0;
 
     struct mbediso_io* io = mbediso_fs_reserve_io(fs);

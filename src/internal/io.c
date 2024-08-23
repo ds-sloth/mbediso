@@ -188,6 +188,8 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector)
         if(!s_mbediso_io_lz4_prepare(io, offset))
             return NULL;
 
+        // printf("seeking %lx...\n", offset);
+
         if(io->buffer_logical_pos + io->buffer_length < offset + 2048)
             return NULL;
 

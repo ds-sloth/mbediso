@@ -43,10 +43,11 @@ bool mbediso_fs_ctor(struct mbediso_fs* fs)
     fs->directory_count = 0;
     fs->directory_capacity = 0;
 
-    // WARNING, root_dir_entry.filename is undefined
     fs->root_dir_entry.sector = 0;
     fs->root_dir_entry.length = 800;
-    fs->root_dir_entry.directory = true;
+    fs->root_dir_entry.directory = false;
+
+    fs->fully_scanned = false;
 
     /* tracks the allocated and used IO instances */
     fs->io_pool = NULL;
@@ -158,7 +159,32 @@ uint32_t mbediso_fs_alloc_directory(struct mbediso_fs* fs)
 void mbediso_fs_free_directory(struct mbediso_fs* fs, uint32_t dir_index)
 {
     mbediso_directory_dtor(&fs->directories[dir_index]);
-    // TODO: free and remove references to dir
+
+    if(dir_index == fs->directory_count - 1)
+        fs->directory_count--;
+    else
+    {
+        // TODO: create free list
+    }
+}
+
+static bool s_mbediso_fs_load_location(struct mbediso_fs* fs, struct mbediso_io* io, struct mbediso_location* location)
+{
+    uint32_t new_dir_index = mbediso_fs_alloc_directory(fs);
+
+    if(new_dir_index == MBEDISO_NULL_REF)
+        return false;
+
+    if(mbediso_directory_load(&fs->directories[new_dir_index], io, location->sector, location->length) != 0)
+    {
+        mbediso_fs_free_directory(fs, new_dir_index);
+        return false;
+    }
+
+    // now save the loaded directory to its location (in its parent)
+    location->sector = new_dir_index;
+    location->length = 0;
+    return true;
 }
 
 bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_location* out)
@@ -166,8 +192,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
     const char* segment_start = path;
 
     struct mbediso_io* io = NULL;
-
-    *out = fs->root_dir_entry;
+    struct mbediso_location* cur_loc = &fs->root_dir_entry;
 
     while(*segment_start != '\0')
     {
@@ -180,15 +205,15 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
         if(segment_start != segment_end)
         {
             // check for directory that is partially / incorrectly loaded
-            if(out->length == 0 && out->sector >= fs->directory_count)
+            if(cur_loc->length == 0 && cur_loc->sector >= fs->directory_count)
             {
                 mbediso_fs_release_io(fs, io);
                 return false;
             }
             // loaded directory
-            else if(out->length == 0)
+            else if(cur_loc->length == 0)
             {
-                if(!mbediso_directory_lookup(&fs->directories[out->sector], segment_start, segment_end - segment_start, out))
+                if(!mbediso_directory_lookup(&fs->directories[cur_loc->sector], segment_start, segment_end - segment_start, &cur_loc))
                 {
                     mbediso_fs_release_io(fs, io);
                     return false;
@@ -203,7 +228,17 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
                 if(!io)
                     return false;
 
-                if(!mbediso_directory_lookup_unloaded(io, out->sector, out->length, segment_start, segment_end - segment_start, out))
+                // try to load to RAM (unless we failed earlier)
+                if(cur_loc != out && s_mbediso_fs_load_location(fs, io, cur_loc))
+                {
+                    // try loading again
+                    continue;
+                }
+
+                // do the rest of the lookup straight from disk
+                cur_loc = out;
+
+                if(!mbediso_directory_lookup_unloaded(io, cur_loc->sector, cur_loc->length, segment_start, segment_end - segment_start, out))
                 {
                     mbediso_fs_release_io(fs, io);
                     return false;
@@ -212,12 +247,12 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
 
             if(*segment_end == '\0')
             {
-                mbediso_fs_release_io(fs, io);
-                return true;
+                // we're done!
+                break;
             }
 
             // fail if got a non-directory, or if not fully loaded
-            if(!out->directory)
+            if(!cur_loc->directory)
             {
                 mbediso_fs_release_io(fs, io);
                 return false;
@@ -227,48 +262,65 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
         segment_start = segment_end + 1;
     }
 
+    // prefer to load a directory before returning it
+    if(cur_loc != out && cur_loc->directory && cur_loc->length != 0)
+    {
+        if(!io)
+            io = mbediso_fs_reserve_io(fs);
+
+        s_mbediso_fs_load_location(fs, io, cur_loc);
+    }
+
     mbediso_fs_release_io(fs, io);
+
+    *out = *cur_loc;
     return true;
 }
 
 struct mbediso_fs_scan_stack_frame
 {
-    uint32_t dir_index;
-    uint32_t sector;
-    uint32_t length;
+    // this is currently safe, but should become an index if the directory entries become allocated in a single vector
+    struct mbediso_location* location;
+    // could track sector here, if loaded during this scan
     uint32_t recurse_child; // which child to expand in this step
 };
 
 int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
 {
-    if(!fs->root_dir_entry.directory || fs->root_dir_entry.length == 0 || fs->directory_count != 0)
+    // already scanned? then there's nothing to do
+    if(fs->fully_scanned)
+        return 0;
+
+    // make sure root has been found
+    if(!fs->root_dir_entry.directory)
         return -1;
 
     struct mbediso_fs_scan_stack_frame stack[16];
     uint32_t stack_level = 0;
 
-    stack[stack_level].dir_index = mbediso_fs_alloc_directory(fs);
-    stack[stack_level].sector = fs->root_dir_entry.sector;
-    stack[stack_level].length = fs->root_dir_entry.length;
-    stack[stack_level].recurse_child = MBEDISO_NULL_REF;
-
-    if(stack[stack_level].dir_index == MBEDISO_NULL_REF)
-        return -1;
+    stack[stack_level].location = &fs->root_dir_entry;
+    stack[stack_level].recurse_child = 0;
 
     while(stack_level < 16)
     {
         struct mbediso_fs_scan_stack_frame* const cur_frame = &stack[stack_level];
 
-        struct mbediso_directory* dir = &fs->directories[cur_frame->dir_index];
-
-        // read directory itself on first step
-        if(cur_frame->recurse_child == MBEDISO_NULL_REF)
+        // need to load directory
+        if(cur_frame->location->length != 0)
         {
-            mbediso_directory_load(dir, io, cur_frame->sector, cur_frame->length);
-
-            // now, start expanding actual children
-            cur_frame->recurse_child = 0;
+            if(!s_mbediso_fs_load_location(fs, io, cur_frame->location))
+            {
+                // this could be a total failure
+                stack_level--;
+                continue;
+            }
         }
+
+        // check that directory index is valid
+        if(cur_frame->location->sector >= fs->directory_count)
+            return -1;
+
+        struct mbediso_directory* const dir = &fs->directories[cur_frame->location->sector];
 
         // done expanding children
         if(cur_frame->recurse_child >= dir->entry_count)
@@ -280,60 +332,47 @@ int mbediso_fs_full_scan(struct mbediso_fs* fs, struct mbediso_io* io)
         struct mbediso_dir_entry* cur_entry = &dir->entries[cur_frame->recurse_child];
         cur_frame->recurse_child++;
 
-        // consider opening a new frame
-        if(cur_entry->l.directory)
+        // skip non-directories
+        if(!cur_entry->l.directory)
+            continue;
+
+        // open a new frame for the child
+
+        // disabled loop checking for now
+#if 0
+        // check for loops
+        uint32_t loop_level;
+        for(loop_level = 0; loop_level <= stack_level; loop_level++)
         {
-            // check for loops
-            uint32_t loop_level;
-            for(loop_level = 0; loop_level <= stack_level; loop_level++)
-            {
-                if(stack[loop_level].sector == cur_entry->l.sector)
-                    break;
-            }
-
-            // don't expand a loop...!
-            if(loop_level <= stack_level)
-            {
-                // instead, mark it properly... "SOON".
-                // should be something like setting the length of cur_entry to zero and the sector to the dir_index of the loop_level
-                continue;
-            }
-
-            // avoid overflowing the stack
-            if(stack_level + 1 >= 16)
-            {
-                // this should be a total failure
-                continue;
-            }
-
-            // check that we can alloc the directory
-            uint32_t new_dir_index = mbediso_fs_alloc_directory(fs);
-            if(new_dir_index == MBEDISO_NULL_REF)
-            {
-                // this should be a total failure
-                continue;
-            }
-
-            // (directory pointer got invalidated by allocation above)
-            dir = &fs->directories[cur_frame->dir_index];
-
-            // okay, we can expand.
-            stack_level++;
-
-            stack[stack_level].dir_index = new_dir_index;
-            stack[stack_level].recurse_child = MBEDISO_NULL_REF;
-            stack[stack_level].sector = cur_entry->l.sector;
-            stack[stack_level].length = cur_entry->l.length;
-
-            // add reference to child directory index
-            cur_entry->l.length = 0;
-            cur_entry->l.sector = new_dir_index;
+            if(stack[loop_level].sector == cur_entry->l.sector)
+                break;
         }
+
+        // don't expand a loop...!
+        if(loop_level <= stack_level)
+        {
+            // instead, mark it properly... "SOON".
+            // should be something like setting the length of cur_entry to zero and the sector to the dir_index of the loop_level
+            continue;
+        }
+#endif
+
+        // avoid overflowing the stack
+        if(stack_level + 1 >= 16)
+        {
+            // this should be a total failure
+            continue;
+        }
+
+        // okay, we can expand.
+        stack_level++;
+
+        stack[stack_level].location = &cur_entry->l;
+        stack[stack_level].recurse_child = 0;
     }
 
-    // success: add reference to root directory index
-    fs->root_dir_entry.length = 0;
-    fs->root_dir_entry.sector = stack[0].dir_index;
+    // success: mark filesystem as scanned
+    fs->fully_scanned = true;
 
     return 0;
 }

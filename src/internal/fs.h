@@ -53,6 +53,7 @@ struct mbediso_fs
     uint32_t io_pool_capacity;
 
     struct mbediso_location root_dir_entry;
+    bool fully_scanned;
 
     /* fixme: add a directory free list */
 
