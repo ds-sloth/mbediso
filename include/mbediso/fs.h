@@ -24,4 +24,5 @@
 struct mbediso_fs;
 
 struct mbediso_fs* mbediso_openfs_file(const char* name, bool full_scan);
+int mbediso_scanfs(struct mbediso_fs* fs);
 void mbediso_closefs(struct mbediso_fs* fs);

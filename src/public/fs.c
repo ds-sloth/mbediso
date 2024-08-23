@@ -65,6 +65,26 @@ struct mbediso_fs* mbediso_openfs_file(const char* name, bool full_scan)
     return fs;
 }
 
+int mbediso_scanfs(struct mbediso_fs* fs)
+{
+    if(!fs)
+        return -1;
+
+    // already loaded? no problem!
+    if(fs->root_dir_entry.length == 0)
+        return 0;
+
+    struct mbediso_io* io = mbediso_fs_reserve_io(fs);
+    if(!io)
+        return -1;
+
+    int ret = mbediso_fs_full_scan(fs, io);
+
+    mbediso_fs_release_io(fs, io);
+
+    return ret;
+}
+
 void mbediso_closefs(struct mbediso_fs* fs)
 {
     if(!fs)
