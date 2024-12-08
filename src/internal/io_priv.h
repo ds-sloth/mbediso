@@ -45,11 +45,19 @@ struct mbediso_io_lz4
     struct mbediso_lz4_header* header;
 
     uint32_t file_pos;
+
+    uint32_t file_buffer_pos;
+    uint32_t file_buffer_length;
+
     uint32_t buffer_logical_pos;
     uint32_t buffer_length;
 
-    // must be larger than 2048
-    uint8_t* compressed_buffer;
-    uint8_t* decompressed_buffer;
+    // must be larger than (block_size + 4), resized as needed
+    uint8_t* file_buffer;
+    // equals block_size, which must be larger than 2048
+    uint8_t* decompression_buffer;
+
+    // this one can be accessed by the rest of the program
+    const uint8_t* public_buffer;
 };
 

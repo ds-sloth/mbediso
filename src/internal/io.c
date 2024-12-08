@@ -80,17 +80,21 @@ static struct mbediso_io* s_mbediso_io_from_file_lz4(FILE* file, struct mbediso_
     io->header = header;
 
     io->file_pos = -1;
-    io->buffer_logical_pos = -1;
+
+    io->file_buffer_length = header->block_size + 4;
+    io->file_buffer_pos = 0 - io->file_buffer_length;
+
     io->buffer_logical_pos = -1;
     io->buffer_length = 0;
 
-    io->compressed_buffer = malloc(header->block_size);
-    io->decompressed_buffer = malloc(header->block_size);
+    io->file_buffer = malloc(io->file_buffer_length);
+    io->decompression_buffer = malloc(header->block_size);
+    io->public_buffer = io->decompression_buffer;
 
-    if(!io->compressed_buffer || !io->decompressed_buffer)
+    if(!io->file_buffer || !io->decompression_buffer)
     {
-        free(io->compressed_buffer);
-        free(io->decompressed_buffer);
+        free(io->file_buffer);
+        free(io->decompression_buffer);
         free(io);
         return NULL;
     }
@@ -123,15 +127,29 @@ static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical
     if(block >= io->header->block_count)
         return false;
 
-    uint32_t offset = io->header->block_offsets[block];
-    if(offset != io->file_pos)
-        fseek(io->file, offset, SEEK_SET);
+    uint32_t read_start = io->header->block_offsets[block];
+    uint32_t to_read = 4 + io->header->block_size;
+    if(block + 1 < io->header->block_count)
+        to_read = io->header->block_offsets[block + 1] - read_start;
+
+    if(to_read > io->file_buffer_length)
+        to_read = io->file_buffer_length;
+
+    // read data from file
+    if(read_start != io->file_pos)
+        fseek(io->file, read_start, SEEK_SET);
 
     io->file_pos = -1;
 
-    uint32_t compressed_length = 0;
-    if(fread(&compressed_length, 4, 1, io->file) != 1)
+    int did_read = fread(io->file_buffer, 1, to_read, io->file);
+    io->file_pos = read_start + did_read;
+
+    io->file_buffer_pos = read_start;
+
+    if(did_read < 4)
         return false;
+
+    uint32_t compressed_length = *(uint32_t*)io->file_buffer;
 
     s_fix_le(&compressed_length);
 
@@ -141,25 +159,22 @@ static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical
     if(compressed_length > io->header->block_size)
         return false;
 
+    int raw_data_bytes = did_read - 4;
+    if(raw_data_bytes < (int)compressed_length)
+        return false;
+
+    const uint8_t* raw_data = io->file_buffer + 4;
     uint32_t decompressed_length = 0;
 
     if(!is_uncompressed)
     {
-        if(fread(io->compressed_buffer, 1, compressed_length, io->file) != compressed_length)
-            return false;
-
-        io->file_pos = offset + 4 + compressed_length;
-
-        decompressed_length = LZ4_decompress_safe((const char*)io->compressed_buffer, (char*)io->decompressed_buffer, compressed_length, io->header->block_size);
+        decompressed_length = LZ4_decompress_safe((const char*)raw_data, (char*)io->decompression_buffer, compressed_length, io->header->block_size);
+        io->public_buffer = io->decompression_buffer;
     }
     else
     {
         decompressed_length = compressed_length;
-
-        if(fread(io->decompressed_buffer, 1, decompressed_length, io->file) != decompressed_length)
-            return false;
-
-        io->file_pos = offset + 4 + decompressed_length;
+        io->public_buffer = raw_data;
     }
 
     if(decompressed_length == 0)
@@ -193,7 +208,7 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector)
         if(io->buffer_logical_pos + io->buffer_length < offset + 2048)
             return NULL;
 
-        return io->decompressed_buffer + (offset - io->buffer_logical_pos);
+        return io->public_buffer + (offset - io->buffer_logical_pos);
     }
     else if(_io->tag == MBEDISO_IO_TAG_UNC)
     {
@@ -250,7 +265,7 @@ size_t mbediso_io_read_direct(struct mbediso_io* _io, uint8_t* dest, uint64_t of
             if(can_read > bytes)
                 can_read = bytes;
 
-            memcpy(dest, io->decompressed_buffer + start, can_read);
+            memcpy(dest, io->public_buffer + start, can_read);
 
             dest += can_read;
             bytes -= can_read;
@@ -304,8 +319,8 @@ void mbediso_io_close(struct mbediso_io* _io)
 
         fclose(io->file);
 
-        free(io->compressed_buffer);
-        free(io->decompressed_buffer);
+        free(io->file_buffer);
+        free(io->decompression_buffer);
 
         free(io);
     }
