@@ -32,19 +32,6 @@
 #include "internal/io_priv.h"
 #include "internal/lz4_header.h"
 
-static uint32_t s_swap_endian(uint32_t r)
-{
-    return ((uint8_t)(r >> 24) << 0) + ((uint8_t)(r >> 16) << 8) + ((uint8_t)(r >> 8) << 16) + ((uint8_t)(r >> 0) << 24);
-}
-
-static void s_fix_le(uint32_t* buffer)
-{
-    if(!(bool)MBEDISO_BIG_ENDIAN)
-        return;
-
-    *buffer = s_swap_endian(*buffer);
-}
-
 static struct mbediso_io* s_mbediso_io_from_file_unc(FILE* file)
 {
     struct mbediso_io_unc* io = malloc(sizeof(struct mbediso_io_unc));
@@ -81,13 +68,14 @@ static struct mbediso_io* s_mbediso_io_from_file_lz4(FILE* file, struct mbediso_
 
     io->file_pos = -1;
 
-    io->file_buffer_length = header->block_size + 4;
-    io->file_buffer_pos = 0 - io->file_buffer_length;
+    io->file_buffer_pos = -1;
+    io->file_buffer_length = 0;
+    io->file_buffer_capacity = header->block_size + 4;
 
     io->buffer_logical_pos = -1;
     io->buffer_length = 0;
 
-    io->file_buffer = malloc(io->file_buffer_length);
+    io->file_buffer = malloc(io->file_buffer_capacity);
     io->decompression_buffer = malloc(header->block_size);
     io->public_buffer = io->decompression_buffer;
 
@@ -110,7 +98,47 @@ struct mbediso_io* mbediso_io_from_file(FILE* file, struct mbediso_lz4_header* h
         return s_mbediso_io_from_file_lz4(file, header);
 }
 
-static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical_pos)
+static void s_mbediso_io_lz4_prepare_file_priv(struct mbediso_io_lz4* io, uint32_t read_start, uint32_t min_bytes, uint32_t want_bytes)
+{
+    // fast path if the required range is already loaded
+    if(read_start > io->file_buffer_pos)
+    {
+        if(read_start + min_bytes < io->file_buffer_pos + io->file_buffer_length)
+            return;
+    }
+
+    io->file_buffer_length = 0;
+
+    if(want_bytes > io->file_buffer_capacity)
+    {
+        uint8_t* new_file_buffer = realloc(io->file_buffer, want_bytes);
+        if(new_file_buffer)
+        {
+            io->file_buffer = new_file_buffer;
+            io->file_buffer_capacity = want_bytes;
+        }
+    }
+
+    if(min_bytes > io->file_buffer_capacity)
+        return;
+
+    // read data from file
+    if(read_start != io->file_pos)
+        fseek(io->file, read_start, SEEK_SET);
+
+    uint32_t to_read = want_bytes;
+
+    if(to_read > io->file_buffer_capacity)
+        to_read = io->file_buffer_capacity;
+
+    int did_read = fread(io->file_buffer, 1, to_read, io->file);
+
+    io->file_pos = read_start + did_read;
+    io->file_buffer_pos = read_start;
+    io->file_buffer_length = did_read;
+}
+
+static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical_pos, uint32_t want_bytes)
 {
     if(logical_pos > io->buffer_logical_pos)
     {
@@ -128,30 +156,32 @@ static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical
         return false;
 
     uint32_t read_start = io->header->block_offsets[block];
-    uint32_t to_read = 4 + io->header->block_size;
+    uint32_t min_bytes = 4 + io->header->block_size;
     if(block + 1 < io->header->block_count)
-        to_read = io->header->block_offsets[block + 1] - read_start;
+        min_bytes = io->header->block_offsets[block + 1] - read_start;
 
-    if(to_read > io->file_buffer_length)
-        to_read = io->file_buffer_length;
+    uint32_t end_block = ((logical_pos + want_bytes) / io->header->block_size) + 1;
+    uint32_t read_end;
+    if(end_block >= io->header->block_count)
+        read_end = io->header->block_offsets[io->header->block_count - 1] + 4 + io->header->block_size;
+    else
+        read_end = io->header->block_offsets[end_block] + 4 + io->header->block_size;
 
-    // read data from file
-    if(read_start != io->file_pos)
-        fseek(io->file, read_start, SEEK_SET);
+    s_mbediso_io_lz4_prepare_file_priv(io, read_start, min_bytes, read_end - read_start);
 
-    io->file_pos = -1;
 
-    int did_read = fread(io->file_buffer, 1, to_read, io->file);
-    io->file_pos = read_start + did_read;
-
-    io->file_buffer_pos = read_start;
-
-    if(did_read < 4)
+    // gather the read buffer for this block
+    if(read_start < io->file_buffer_pos || read_start >= io->file_buffer_pos + io->file_buffer_length)
         return false;
 
-    uint32_t compressed_length = *(uint32_t*)io->file_buffer;
+    const uint8_t* block_buffer = io->file_buffer + (read_start - io->file_buffer_pos);
+    uint32_t block_buffer_size = (io->file_buffer_length + io->file_buffer_pos) - read_start;
 
-    s_fix_le(&compressed_length);
+    // ensure we have a complete header
+    if(block_buffer_size < 4)
+        return false;
+
+    uint32_t compressed_length = (block_buffer[0] << 0) + (block_buffer[1] << 8) + (block_buffer[2] << 16) + (block_buffer[3] << 24);
 
     bool is_uncompressed = (compressed_length & 0x80000000);
     compressed_length &= ~(uint32_t)0x80000000;
@@ -159,22 +189,25 @@ static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical
     if(compressed_length > io->header->block_size)
         return false;
 
-    int raw_data_bytes = did_read - 4;
-    if(raw_data_bytes < (int)compressed_length)
+    // done with the header
+    block_buffer_size -= 4;
+    block_buffer += 4;
+
+    // check that we have the entire block in memory
+    if(block_buffer_size < compressed_length)
         return false;
 
-    const uint8_t* raw_data = io->file_buffer + 4;
     uint32_t decompressed_length = 0;
 
     if(!is_uncompressed)
     {
-        decompressed_length = LZ4_decompress_safe((const char*)raw_data, (char*)io->decompression_buffer, compressed_length, io->header->block_size);
+        decompressed_length = LZ4_decompress_safe((const char*)block_buffer, (char*)io->decompression_buffer, compressed_length, io->header->block_size);
         io->public_buffer = io->decompression_buffer;
     }
     else
     {
         decompressed_length = compressed_length;
-        io->public_buffer = raw_data;
+        io->public_buffer = block_buffer;
     }
 
     if(decompressed_length == 0)
@@ -200,7 +233,7 @@ const uint8_t* mbediso_io_read_sector(struct mbediso_io* _io, uint32_t sector)
         struct mbediso_io_lz4* io = (struct mbediso_io_lz4*)_io;
 
         size_t offset = sector * 2048;
-        if(!s_mbediso_io_lz4_prepare(io, offset))
+        if(!s_mbediso_io_lz4_prepare(io, offset, 2048))
             return NULL;
 
         // printf("seeking %lx...\n", offset);
@@ -256,7 +289,7 @@ size_t mbediso_io_read_direct(struct mbediso_io* _io, uint8_t* dest, uint64_t of
 
         while(bytes > 0)
         {
-            if(!s_mbediso_io_lz4_prepare(io, offset))
+            if(!s_mbediso_io_lz4_prepare(io, offset, bytes))
                 return bytes_wanted - bytes;
 
             size_t can_read = (io->buffer_logical_pos + io->buffer_length) - offset;

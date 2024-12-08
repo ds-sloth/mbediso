@@ -48,6 +48,7 @@ struct mbediso_io_lz4
 
     uint32_t file_buffer_pos;
     uint32_t file_buffer_length;
+    uint32_t file_buffer_capacity;
 
     uint32_t buffer_logical_pos;
     uint32_t buffer_length;
