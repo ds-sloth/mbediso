@@ -171,8 +171,8 @@ bool LZ4Pack::compress(FILE* outf, FILE* inf, size_t block_size, bool big_endian
 
             uint8_t block_header[4];
 
-            // fall back to uncompressed data
-            if(to_write > block_size)
+            // fall back to uncompressed data if worse than 50% compression ratio
+            if(to_write > to_compress * 5 / 10)
             {
                 write_uint32_le(block_header, to_compress | 0x80000000);
 
