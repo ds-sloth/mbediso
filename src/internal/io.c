@@ -101,9 +101,9 @@ struct mbediso_io* mbediso_io_from_file(FILE* file, struct mbediso_lz4_header* h
 static void s_mbediso_io_lz4_prepare_file_priv(struct mbediso_io_lz4* io, uint32_t read_start, uint32_t min_bytes, uint32_t want_bytes)
 {
     // fast path if the required range is already loaded
-    if(read_start > io->file_buffer_pos)
+    if(read_start >= io->file_buffer_pos)
     {
-        if(read_start + min_bytes < io->file_buffer_pos + io->file_buffer_length)
+        if(read_start + min_bytes <= io->file_buffer_pos + io->file_buffer_length)
             return;
     }
 
@@ -165,7 +165,7 @@ static bool s_mbediso_io_lz4_prepare(struct mbediso_io_lz4* io, uint32_t logical
     if(end_block >= io->header->block_count)
         read_end = io->header->block_offsets[io->header->block_count - 1] + 4 + io->header->block_size;
     else
-        read_end = io->header->block_offsets[end_block] + 4 + io->header->block_size;
+        read_end = io->header->block_offsets[end_block];
 
     s_mbediso_io_lz4_prepare_file_priv(io, read_start, min_bytes, read_end - read_start);
 
