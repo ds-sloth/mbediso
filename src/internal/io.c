@@ -32,6 +32,12 @@
 #include "internal/io_priv.h"
 #include "internal/lz4_header.h"
 
+#ifdef __NDS__
+static const uint32_t c_max_buffer_capacity = 32 * 1024;
+#else
+static const uint32_t c_max_buffer_capacity = 64 * 1024;
+#endif
+
 static struct mbediso_io* s_mbediso_io_from_file_unc(FILE* file)
 {
     struct mbediso_io_unc* io = malloc(sizeof(struct mbediso_io_unc));
@@ -108,6 +114,9 @@ static void s_mbediso_io_lz4_prepare_file_priv(struct mbediso_io_lz4* io, uint32
     }
 
     io->file_buffer_length = 0;
+
+    if(want_bytes > c_max_buffer_capacity)
+        want_bytes = c_max_buffer_capacity;
 
     if(want_bytes > io->file_buffer_capacity)
     {
