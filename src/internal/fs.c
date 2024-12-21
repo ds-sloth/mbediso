@@ -30,6 +30,7 @@
 #include "internal/fs.h"
 #include "internal/io.h"
 #include "internal/lz4_header.h"
+#include "internal/mutex/mutex.h"
 
 bool mbediso_fs_ctor(struct mbediso_fs* fs)
 {
@@ -54,6 +55,19 @@ bool mbediso_fs_ctor(struct mbediso_fs* fs)
     fs->io_pool_used = 0;
     fs->io_pool_size = 0;
     fs->io_pool_capacity = 0;
+
+    /* allocate mutexes */
+    fs->io_pool_mutex = mbediso_mutex_alloc();
+    if(!fs->io_pool_mutex)
+        return false;
+
+    fs->lookup_mutex = mbediso_mutex_alloc();
+    if(!fs->lookup_mutex)
+    {
+        mbediso_mutex_free(fs->io_pool_mutex);
+        fs->io_pool_mutex = NULL;
+        return false;
+    }
 
     return true;
 }
@@ -96,6 +110,18 @@ void mbediso_fs_dtor(struct mbediso_fs* fs)
     {
         mbediso_lz4_header_free(fs->lz4_header);
         fs->lz4_header = NULL;
+    }
+
+    if(fs->io_pool_mutex)
+    {
+        mbediso_mutex_free(fs->io_pool_mutex);
+        fs->io_pool_mutex = NULL;
+    }
+
+    if(fs->lookup_mutex)
+    {
+        mbediso_mutex_free(fs->lookup_mutex);
+        fs->lookup_mutex = NULL;
     }
 }
 
@@ -194,6 +220,8 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
     struct mbediso_io* io = NULL;
     struct mbediso_location* cur_loc = &fs->root_dir_entry;
 
+    mbediso_mutex_lock(fs->lookup_mutex);
+
     while(*segment_start != '\0')
     {
         const char* segment_end = segment_start;
@@ -208,6 +236,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
             if(cur_loc->length == 0 && cur_loc->sector >= fs->directory_count)
             {
                 mbediso_fs_release_io(fs, io);
+                mbediso_mutex_unlock(fs->lookup_mutex);
                 return false;
             }
             // loaded directory
@@ -216,6 +245,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
                 if(!mbediso_directory_lookup(&fs->directories[cur_loc->sector], segment_start, segment_end - segment_start, &cur_loc))
                 {
                     mbediso_fs_release_io(fs, io);
+                    mbediso_mutex_unlock(fs->lookup_mutex);
                     return false;
                 }
             }
@@ -226,7 +256,10 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
                     io = mbediso_fs_reserve_io(fs);
 
                 if(!io)
+                {
+                    mbediso_mutex_unlock(fs->lookup_mutex);
                     return false;
+                }
 
                 // try to load to RAM (unless we failed earlier)
                 if(cur_loc != out && s_mbediso_fs_load_location(fs, io, cur_loc))
@@ -241,6 +274,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
                 if(!mbediso_directory_lookup_unloaded(io, cur_loc->sector, cur_loc->length, segment_start, segment_end - segment_start, out))
                 {
                     mbediso_fs_release_io(fs, io);
+                    mbediso_mutex_unlock(fs->lookup_mutex);
                     return false;
                 }
             }
@@ -255,6 +289,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
             if(!cur_loc->directory)
             {
                 mbediso_fs_release_io(fs, io);
+                mbediso_mutex_unlock(fs->lookup_mutex);
                 return false;
             }
         }
@@ -272,6 +307,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
     }
 
     mbediso_fs_release_io(fs, io);
+    mbediso_mutex_unlock(fs->lookup_mutex);
 
     *out = *cur_loc;
     return true;
@@ -405,10 +441,14 @@ static struct mbediso_io* s_mbediso_fs_reserve_io_fp(struct mbediso_fs* fs, FILE
     if(!fs)
         return NULL;
 
-    // FIXME: should lock here
+    mbediso_mutex_lock(fs->io_pool_mutex);
 
     if(fs->io_pool_size > fs->io_pool_used)
-        return fs->io_pool[fs->io_pool_used++];
+    {
+        struct mbediso_io* ret = fs->io_pool[fs->io_pool_used++];
+        mbediso_mutex_unlock(fs->io_pool_mutex);
+        return ret;
+    }
 
     if(fs->io_pool_size + 1 > fs->io_pool_capacity)
     {
@@ -422,14 +462,22 @@ static struct mbediso_io* s_mbediso_fs_reserve_io_fp(struct mbediso_fs* fs, FILE
     }
 
     if(fs->io_pool_size + 1 > fs->io_pool_capacity)
+    {
+        mbediso_mutex_unlock(fs->io_pool_mutex);
         return NULL;
+    }
 
     struct mbediso_io* io = s_mbediso_fs_construct_io(fs, fp);
     if(!io)
+    {
+        mbediso_mutex_unlock(fs->io_pool_mutex);
         return NULL;
+    }
 
     fs->io_pool[fs->io_pool_size++] = io;
     fs->io_pool_used++;
+
+    mbediso_mutex_unlock(fs->io_pool_mutex);
 
     return io;
 }
@@ -444,7 +492,7 @@ void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
     if(!fs || !io)
         return;
 
-    // FIXME: should lock here
+    mbediso_mutex_lock(fs->io_pool_mutex);
 
     for(uint32_t i = 0; i < fs->io_pool_used; i++)
     {
@@ -453,11 +501,13 @@ void mbediso_fs_release_io(struct mbediso_fs* fs, struct mbediso_io* io)
             fs->io_pool_used--;
             fs->io_pool[i] = fs->io_pool[fs->io_pool_used];
             fs->io_pool[fs->io_pool_used] = io;
+            mbediso_mutex_unlock(fs->io_pool_mutex);
             return;
         }
     }
 
     // if we got here, this is a big problem
+    mbediso_mutex_unlock(fs->io_pool_mutex);
 }
 
 /* the purpose of this function is to adopt the file pointer used for lz4 detection and initialization into the IO pool */

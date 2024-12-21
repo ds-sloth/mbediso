@@ -25,6 +25,7 @@
 #include "internal/directory.h"
 
 struct mbediso_lz4_header;
+typedef void* mbediso_mutex_t;
 
 struct mbediso_fs
 {
@@ -54,6 +55,10 @@ struct mbediso_fs
 
     struct mbediso_location root_dir_entry;
     bool fully_scanned;
+
+    /* locks for the io pool and the lookup function (which may modify the fs) */
+    mbediso_mutex_t io_pool_mutex;
+    mbediso_mutex_t lookup_mutex;
 
     /* fixme: add a directory free list */
 

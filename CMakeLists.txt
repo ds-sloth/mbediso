@@ -21,6 +21,14 @@ set(MBEDISO_SRC
     src/public/fs.c
 )
 
+set(MBEDISO_THREADS_DEFAULT "NONE")
+set(MBEDISO_THREADS "${MBEDISO_THREADS_DEFAULT}" CACHE STRING "Threading library for mbediso [NONE, ...]")
+
+if("${MBEDISO_THREADS}" STREQUAL "NONE")
+    message("== mbediso will be built without mutex support. The resulting library is not thread safe.")
+    list(APPEND MBEDISO_SRC src/internal/mutex/mutex_none.c)
+endif()
+
 add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
