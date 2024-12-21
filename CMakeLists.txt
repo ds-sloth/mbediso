@@ -27,6 +27,11 @@ set(MBEDISO_THREADS "${MBEDISO_THREADS_DEFAULT}" CACHE STRING "Threading library
 if("${MBEDISO_THREADS}" STREQUAL "NONE")
     message("== mbediso will be built without mutex support. The resulting library is not thread safe.")
     list(APPEND MBEDISO_SRC src/internal/mutex/mutex_none.c)
+elseif("${MBEDISO_THREADS}" STREQUAL "SDL2")
+    message("== mbediso will be built with SDL2 mutex support.")
+    list(APPEND MBEDISO_SRC src/internal/mutex/mutex_sdl2.c)
+else()
+    message("== mbediso will be built with application-provided mutex support.")
 endif()
 
 add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
