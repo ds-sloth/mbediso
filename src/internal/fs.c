@@ -213,14 +213,80 @@ static bool s_mbediso_fs_load_location(struct mbediso_fs* fs, struct mbediso_io*
     return true;
 }
 
+static bool s_mbediso_check_path_segments(const char* path, bool* skip_segment, bool* skip_segment_end)
+{
+    const int path_part_bound = skip_segment_end - skip_segment;
+
+    // check which paths to skip (`.`, victims of `..`, and invalid `..`)
+    const char* segment_start = path;
+    int path_part = 0;
+
+    while(*segment_start != '\0' && path_part < path_part_bound)
+    {
+        const char* segment_end = segment_start;
+
+        while(*segment_end != '/' && *segment_end != '\0')
+            segment_end++;
+
+        // empty segment
+        if(segment_start == segment_end)
+            skip_segment[path_part] = true;
+        // normal segment
+        else if(*segment_start != '.')
+            skip_segment[path_part] = false;
+        // `.`
+        else if(segment_end == segment_start + 1)
+            skip_segment[path_part] = true;
+        // `..`
+        else if(segment_end == segment_start + 2 && *(segment_start + 1) == '.')
+        {
+            // cancel the most recent non-skipped segment
+            int i;
+            for(i = path_part - 1; i >= 0; i--)
+            {
+                if(!skip_segment[i])
+                {
+                    skip_segment[i] = true;
+                    break;
+                }
+            }
+
+            // invalid `..`
+            if(i < 0)
+                return false;
+        }
+        // normal segment starting with `.`
+        else
+            skip_segment[path_part] = false;
+
+        segment_start = segment_end + 1;
+        path_part++;
+    }
+
+    // more than allowed segment count, invalid path
+    if(*segment_start != '\0')
+        return false;
+
+    return true;
+}
+
 bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_location* out)
 {
-    const char* segment_start = path;
+    // check which paths to skip (`.`, victims of `..`, and invalid `..`)
+    bool skip_segment[16];
+
+    // check that path is valid, and which path segments to skip
+    if(!s_mbediso_check_path_segments(path, skip_segment + 0, skip_segment + 16))
+        return false;
+
 
     struct mbediso_io* io = NULL;
     struct mbediso_location* cur_loc = &fs->root_dir_entry;
 
     mbediso_mutex_lock(fs->lookup_mutex);
+
+    const char* segment_start = path;
+    int path_part = 0;
 
     while(*segment_start != '\0')
     {
@@ -230,7 +296,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
             segment_end++;
 
         // seek the segment
-        if(segment_start != segment_end)
+        if(!skip_segment[path_part])
         {
             // check for directory that is partially / incorrectly loaded
             if(cur_loc->length == 0 && cur_loc->sector >= fs->directory_count)
@@ -295,6 +361,7 @@ bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_l
         }
 
         segment_start = segment_end + 1;
+        path_part++;
     }
 
     // prefer to load a directory before returning it
