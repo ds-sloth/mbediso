@@ -1,3 +1,4 @@
 [submodule "lz4"]
 	path = lz4
 	url = https://github.com/ds-sloth/lz4
+	branch = release-patches
