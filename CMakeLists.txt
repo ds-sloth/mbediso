@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2...3.5)
 
 include(TestBigEndian)
+include(GNUInstallDirs)
 
 if(POLICY CMP0069) # Allow CMAKE_INTERPROCEDURAL_OPTIMIZATION (lto) to be set
     cmake_policy(SET CMP0069 NEW)
@@ -54,9 +55,9 @@ target_include_directories(mbediso PRIVATE
 target_include_directories(mbediso PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 install(TARGETS mbediso
-        LIBRARY DESTINATION "lib"
-        ARCHIVE DESTINATION "lib"
-        INCLUDES DESTINATION "include")
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 if(NOT MSVC)
     target_compile_options(mbediso PRIVATE -Wall -Wextra -pedantic)
