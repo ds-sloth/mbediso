@@ -56,8 +56,24 @@ target_include_directories(mbediso PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 install(TARGETS mbediso
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+install(FILES include/mbediso.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+install(DIRECTORY include/mbediso
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+install(FILES
+    lz4/lib/lz4.h
+    lz4/lib/lz4hc.h
+    lz4/lib/lz4file.h
+    lz4/lib/lz4frame.h
+    lz4/lib/lz4frame_static.h
+    util/lz4_pack/include/lz4_pack.h
+DESTINATION
+    "${CMAKE_INSTALL_INCLUDEDIR}/mbediso/lz4"
+)
 
 if(NOT MSVC)
     target_compile_options(mbediso PRIVATE -Wall -Wextra -pedantic)
