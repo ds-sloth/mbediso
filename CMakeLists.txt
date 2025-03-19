@@ -22,6 +22,8 @@ set(MBEDISO_SRC
     src/public/fs.c
 )
 
+option(USE_EXTERNAL_LZ4 "Use externally provided LZ4" OFF)
+
 set(MBEDISO_THREADS_DEFAULT "NONE")
 set(MBEDISO_THREADS "${MBEDISO_THREADS_DEFAULT}" CACHE STRING "Threading library for mbediso [NONE, ...]")
 
@@ -35,7 +37,15 @@ else()
     message("== mbediso will be built with application-provided mutex support.")
 endif()
 
-add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
+if(USE_EXTERNAL_LZ4)
+    add_library(lz4_static INTERFACE)
+    set(LZ4_INCLUDE_DIRS "/usr/include" CACHE STRING "Include path to the LZ4 library")
+    set(LZ4_LIBRARIES "lz4_pack_static;lz4" CACHE STRING "LZ4 libraries to link")
+    target_include_directories(lz4_static INTERFACE "${LZ4_INCLUDE_DIRS}")
+    target_link_libraries(lz4_static INTERFACE ${LZ4_LIBRARIES})
+else()
+    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
+endif()
 
 add_library(mbediso STATIC ${MBEDISO_SRC})
 
@@ -64,16 +74,17 @@ install(DIRECTORY include/mbediso
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 
-install(FILES
-    lz4/lib/lz4.h
-    lz4/lib/lz4hc.h
-    lz4/lib/lz4file.h
-    lz4/lib/lz4frame.h
-    lz4/lib/lz4frame_static.h
-    util/lz4_pack/include/lz4_pack.h
-DESTINATION
-    "${CMAKE_INSTALL_INCLUDEDIR}/mbediso/lz4"
-)
+if(NOT USE_EXTERNAL_LZ4)
+    install(FILES
+        lz4/lib/lz4.h
+        lz4/lib/lz4hc.h
+        lz4/lib/lz4file.h
+        lz4/lib/lz4frame.h
+        lz4/lib/lz4frame_static.h
+    DESTINATION
+        "${CMAKE_INSTALL_INCLUDEDIR}/mbediso/lz4"
+    )
+endif()
 
 if(NOT MSVC)
     target_compile_options(mbediso PRIVATE -Wall -Wextra -pedantic)
