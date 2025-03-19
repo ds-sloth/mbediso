@@ -90,7 +90,15 @@ project(lz4_pack VERSION 0.0 LANGUAGES CXX)
 
 add_library(lz4_pack_static util/lz4_pack/lz4_pack.cpp)
 target_include_directories(lz4_pack_static PUBLIC util/lz4_pack/include)
+set_target_properties(lz4_pack_static PROPERTIES PUBLIC_HEADER "util/lz4_pack/include/lz4_pack.h")
 target_link_libraries(lz4_pack_static PUBLIC lz4_static)
 
 add_executable(lz4_pack_cli util/lz4_pack/main.cpp)
 target_link_libraries(lz4_pack_cli PRIVATE lz4_pack_static)
+
+install(TARGETS lz4_pack_static lz4_pack_cli
+	RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+	LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
