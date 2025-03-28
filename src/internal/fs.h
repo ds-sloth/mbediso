@@ -33,6 +33,8 @@ struct mbediso_fs
     char* archive_path;
     struct mbediso_lz4_header* lz4_header;
 
+    /* these aren't implemented yet */
+#if 0
     /* total memory usage and budget of the filesystem */
     uint32_t mem_usage;
     uint32_t mem_capacity;
@@ -41,6 +43,7 @@ struct mbediso_fs
     uint8_t* stringtable;
     uint32_t stringtable_size;
     uint32_t stringtable_capacity;
+#endif
 
     /* stores either all directories, or the currently loaded directories (owned by the pathcache) */
     struct mbediso_directory* directories;
