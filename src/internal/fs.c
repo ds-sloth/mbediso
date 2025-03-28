@@ -259,6 +259,11 @@ static bool s_mbediso_check_path_segments(const char* path, bool* skip_segment, 
         else
             skip_segment[path_part] = false;
 
+        // immediately return when reaching end of string
+        if(*segment_end == '\0')
+            return true;
+
+        // begin next segment if not at end of string
         segment_start = segment_end + 1;
         path_part++;
     }
