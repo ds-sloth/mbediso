@@ -21,7 +21,7 @@
 
 typedef void* mbediso_mutex_t;
 
-mbediso_mutex_t mbediso_mutex_alloc();
+mbediso_mutex_t mbediso_mutex_alloc(void);
 void mbediso_mutex_free(mbediso_mutex_t mutex);
 void mbediso_mutex_lock(mbediso_mutex_t mutex);
 void mbediso_mutex_unlock(mbediso_mutex_t mutex);

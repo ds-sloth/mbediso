@@ -21,7 +21,7 @@
 
 #include "SDL2/SDL_mutex.h"
 
-mbediso_mutex_t mbediso_mutex_alloc()
+mbediso_mutex_t mbediso_mutex_alloc(void)
 {
     return (mbediso_mutex_t)SDL_CreateMutex();
 }
