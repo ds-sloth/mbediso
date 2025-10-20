@@ -240,6 +240,9 @@ static bool s_mbediso_check_path_segments(const char* path, bool* skip_segment, 
         // `..`
         else if(segment_end == segment_start + 2 && *(segment_start + 1) == '.')
         {
+            // skip `..` itself
+            skip_segment[path_part] = true;
+
             // cancel the most recent non-skipped segment
             int i;
             for(i = path_part - 1; i >= 0; i--)
@@ -278,13 +281,8 @@ static bool s_mbediso_check_path_segments(const char* path, bool* skip_segment, 
 bool mbediso_fs_lookup(struct mbediso_fs* fs, const char* path, struct mbediso_location* out)
 {
     // check which paths to skip (`.`, victims of `..`, and invalid `..`)
-    bool skip_segment[16] =
-    {
-        false, false, false, false,
-        false, false, false, false,
-        false, false, false, false,
-        false, false, false, false
-    };
+    // array initialized by callee
+    bool skip_segment[16];
 
     // check that path is valid, and which path segments to skip
     if(!s_mbediso_check_path_segments(path, skip_segment + 0, skip_segment + 16))
